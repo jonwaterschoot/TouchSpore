@@ -7,13 +7,18 @@ using namespace daisy;
 using namespace daisysp;
 
 namespace {
-// Fixed thresholds for the control pads (P10/P11), in counts of (baseline − filtered)
-constexpr float    kFirmOn      = 24.f;
-constexpr float    kFirmOff     = 14.f;
+// Fixed thresholds for the control pads (P10/P11), in counts of (baseline − filtered).
+// Same as libDaisy's MPR121 defaults (12/6), which TouchString uses on this board.
+constexpr float    kFirmOn      = 12.f;
+constexpr float    kFirmOff     = 6.f;
+constexpr float    kFirmNoise   = 6.f;     // …but never below the pad's own noise × this
 constexpr float    kBaseUpRate  = 0.05f;   // reading above baseline (finger left / drift): recover fast
 constexpr uint16_t kStuckPolls  = 5000;    // ~20 s active → let the baseline creep (anti-stuck)
 constexpr uint8_t  kStrikePolls = 3;       // velocity is the peak over the first 3 polls (~12 ms)
 constexpr uint16_t kSettlePolls = 125;     // ~0.5 s noise/baseline learning after calibration
+constexpr uint16_t kHealthPolls = 250;     // ~1 s between chip checks
+constexpr uint16_t kFailPolls   = 25;      // ~0.1 s of failed reads → reset the I2C peripheral
+constexpr uint8_t  kEcrRun      = 0xBC;    // CL = 10, ELEPROX_EN = 11 (ELE0..11 as electrode 13), 12 electrodes
 
 inline float lerp(float a, float b, float t) { return a + (b - a) * t; }
 inline float lerp_exp(float a, float b, float t) { return a * powf(b / a, t); }
@@ -23,9 +28,9 @@ inline float smoothstep(float e0, float e1, float x) {
 }
 }
 
-void Field::_WriteRegister(uint8_t reg, uint8_t val) {
+bool Field::_WriteRegister(uint8_t reg, uint8_t val) {
     uint8_t buf[2] = { reg, val };
-    _i2c.TransmitBlocking(kAddr, buf, 2, 10);
+    return _i2c.TransmitBlocking(kAddr, buf, 2, 10) == I2CHandle::Result::OK;
 }
 
 bool Field::_ReadBurst(uint8_t start_reg, uint8_t* buffer, uint16_t size) {
@@ -34,13 +39,12 @@ bool Field::_ReadBurst(uint8_t start_reg, uint8_t* buffer, uint16_t size) {
 }
 
 void Field::Init(DaisySeed& hw) {
-    I2CHandle::Config cfg;
-    cfg.mode           = I2CHandle::Config::Mode::I2C_MASTER;
-    cfg.periph         = I2CHandle::Config::Peripheral::I2C_1;
-    cfg.speed          = I2CHandle::Config::Speed::I2C_400KHZ;
-    cfg.pin_config.scl = Pin(PORTB, 8);
-    cfg.pin_config.sda = Pin(PORTB, 9);
-    _i2c.Init(cfg);
+    _i2c_cfg.mode           = I2CHandle::Config::Mode::I2C_MASTER;
+    _i2c_cfg.periph         = I2CHandle::Config::Peripheral::I2C_1;
+    _i2c_cfg.speed          = I2CHandle::Config::Speed::I2C_400KHZ;
+    _i2c_cfg.pin_config.scl = Pin(PORTB, 8);
+    _i2c_cfg.pin_config.sda = Pin(PORTB, 9);
+    _i2c.Init(_i2c_cfg);
 
     SetSensitivity(0.f);
     _Configure(Profile::Smooth);
@@ -48,15 +52,17 @@ void Field::Init(DaisySeed& hw) {
 
 void Field::_Configure(Profile p) {
     _profile = p;
+    _health = kHealthPolls;
 
-    _WriteRegister(0x80, 0x63);   // soft reset
+    // No answer: don't stall the main loop on ~60 more timeouts; _CheckChip retries later
+    if (!_WriteRegister(0x80, 0x63)) return;   // soft reset
     System::Delay(5);
     _WriteRegister(0x5E, 0x00);   // stop mode
 
-    // Chip thresholds are irrelevant (status is ignored) but keep them sane for debugging.
+    // Chip touch status is only used for P10/P11 (IsFirmTouched): libDaisy's defaults, as in TouchString
     for (uint8_t i = 0; i < 12; i++) {
-        _WriteRegister(0x41 + i * 2, 4);
-        _WriteRegister(0x42 + i * 2, 2);
+        _WriteRegister(0x41 + i * 2, static_cast<uint8_t>(kFirmOn));
+        _WriteRegister(0x42 + i * 2, static_cast<uint8_t>(kFirmOff));
     }
     _WriteRegister(0x59, 4);      // ELEPROX touch
     _WriteRegister(0x5A, 2);      // ELEPROX release
@@ -88,11 +94,11 @@ void Field::_Configure(Profile p) {
     _WriteRegister(0x7F, 180);    // TL
     _WriteRegister(0x7C, 0x00);
 
-    // Run: CL = 10, ELEPROX_EN = 11 (ELE0..11 combined as electrode 13), 12 electrodes
-    _WriteRegister(0x5E, 0xBC);
+    _WriteRegister(0x5E, kEcrRun);
     System::Delay(80);
 
     for (auto& e : _el) e = Electrode {};
+    _chip_touch = 0;
     _settle = kSettlePolls;
 }
 
@@ -123,9 +129,35 @@ void Field::_UpdateDerived() {
     _flick_refr = static_cast<uint8_t>(lerp(75.f, 12.f, f));   // 300 ms → 48 ms between flickers per pad
 }
 
+// Keeps the chip alive. A static discharge from a finger or a clipped wire can reset the
+// MPR121: it then sits in Stop mode and keeps returning frozen data without any I2C error,
+// so the whole field would go silent. A stuck bus is reset the same way.
+bool Field::_CheckChip() {
+    if (_fails >= kFailPolls) {
+        _fails = 0;
+        _i2c.Init(_i2c_cfg);
+        _Configure(_profile);
+        return false;
+    }
+    if (_health > 0 && --_health > 0) return true;
+    _health = kHealthPolls;
+    uint8_t ecr = 0;
+    if (_ReadBurst(0x5E, &ecr, 1) && ecr != kEcrRun) {
+        _Configure(_profile);
+        return false;
+    }
+    return true;
+}
+
 void Field::Process() {
-    uint8_t raw[spore::kElectrodes * 2];
-    if (!_ReadBurst(0x04, raw, sizeof(raw))) return;  // filtered data ELE0..ELE12
+    if (!_CheckChip()) return;
+
+    // Touch status (2 bytes), out-of-range status (2), filtered data ELE0..ELE12 (26)
+    uint8_t buf[4 + spore::kElectrodes * 2];
+    if (!_ReadBurst(0x00, buf, sizeof(buf))) { _fails++; return; }
+    _fails = 0;
+    _chip_touch = static_cast<uint16_t>(buf[0] | (buf[1] << 8)) & 0x0FFF;
+    const uint8_t* raw = buf + 4;
 
     const bool settling = _settle > 0;
     if (settling) _settle--;
@@ -150,7 +182,8 @@ void Field::Process() {
             e.noise += (d - e.noise) * 0.05f;
             continue;
         }
-        if (!e.active) {
+        // A firm touch also freezes the baseline, so a held control pad isn't learned away
+        if (!e.active && !e.firm) {
             e.base  += (f - e.base) * ((delta < 0.f) ? kBaseUpRate : _base_rate);
             e.noise += (d - e.noise) * 0.01f;
             e.held   = 0;
@@ -160,8 +193,9 @@ void Field::Process() {
         const float noise = fmaxf(e.noise, 0.25f);
 
         // Firm touch (fixed, for control pads) ............................
-        if (!e.firm && delta > kFirmOn)       e.firm = true;
-        else if (e.firm && delta < kFirmOff)  e.firm = false;
+        const float firm_on = fmaxf(kFirmOn, noise * kFirmNoise);
+        if (!e.firm && delta > firm_on)                            e.firm = true;
+        else if (e.firm && delta < firm_on * (kFirmOff / kFirmOn)) e.firm = false;
 
         // Continuous level .................................................
         const float thr = fmaxf(_thr, noise * _noise_mul);

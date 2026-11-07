@@ -49,4 +49,7 @@ static constexpr uint8_t kPlinkGateSteps   = 2;   // note-off after 2 sixteenths
 #if !DEBUG
 #define USB_MIDI
 #endif
-#define UART_MIDI
+// TRS MIDI (USART1, RX D14 / TX D13) needs the TRS MIDI mod: build with `make UART_MIDI=1`.
+// Off by default: on a stock Simple Touch D14 is unconnected and floats, and the noise
+// on it trips libDaisy's UART error handling into an interrupt storm that starves the
+// main loop (controls freeze, audio keeps running).

@@ -51,8 +51,9 @@ public:
     float Aura() const              { return _aura; }            // whole-board presence 0..1
 
     // Fixed-threshold touch, independent of the fader. Used for the P10/P11 control pads,
-    // which must stay reliable when the field is hyper sensitive.
-    bool  IsFirmTouched(uint8_t e) const { return _el[e].firm; }
+    // which must stay reliable when the field is hyper sensitive. Either the chip's own
+    // touch detection (same thresholds as TouchString) or the software one.
+    bool  IsFirmTouched(uint8_t e) const { return _el[e].firm || (_chip_touch & (1u << e)); }
 
     Profile CurrentProfile() const { return _profile; }
 
@@ -77,13 +78,18 @@ private:
     };
 
     void _Configure(Profile p);
-    void _WriteRegister(uint8_t reg, uint8_t val);
+    bool _CheckChip();
+    bool _WriteRegister(uint8_t reg, uint8_t val);
     bool _ReadBurst(uint8_t start_reg, uint8_t* buffer, uint16_t size);
     void _UpdateDerived();
 
     static constexpr uint8_t kAddr = 0x5A;
 
-    daisy::I2CHandle _i2c;
+    daisy::I2CHandle         _i2c;
+    daisy::I2CHandle::Config _i2c_cfg;
+    uint16_t _chip_touch = 0;      // MPR121 touch status bits
+    uint16_t _fails      = 0;      // consecutive failed reads
+    uint16_t _health     = 0;      // polls until the next chip check
     FieldListener*   _listener = nullptr;
     std::array<Electrode, spore::kElectrodes> _el;
 

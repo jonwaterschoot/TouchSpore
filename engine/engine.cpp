@@ -7,6 +7,21 @@ using namespace spore;
 namespace {
 inline float mtof(int note) { return 440.f * powf(2.f, (note - 69) / 12.f); }
 inline uint8_t vel7(float v) { int x = static_cast<int>(v * 127.f); return static_cast<uint8_t>(x < 1 ? 1 : (x > 127 ? 127 : x)); }
+inline float clamp01(float x) { return x < 0.f ? 0.f : (x > 1.f ? 1.f : x); }
+
+// Plink tone (S34), three zones: 0–0.45 glass → wood, 0.45–0.55 wood, 0.55–1 drive
+PlinkTone ToneFor(float tone) {
+    PlinkTone pt;
+    pt.blend = fminf(tone / 0.45f, 1.f);
+    const float d = (tone > 0.55f) ? (tone - 0.55f) / 0.45f : 0.f;
+    pt.drive  = 1.f + 11.f * d * d;
+    // Same peak as clean for a full-velocity note (peak ≈ 0.38), a little under at full
+    // drive since a saturated wave sounds louder at the same peak
+    const float ref = 0.38f * pt.drive;
+    pt.makeup = sqrtf(1.f + ref * ref) / pt.drive * (1.f - 0.2f * d);
+    pt.lp     = 1.f - 0.7f * d;                        // open → ~2.7 kHz
+    return pt;
+}
 }
 
 void Engine::Init(float sr, float* delay_l, float* delay_r, size_t delay_len) {
@@ -23,6 +38,7 @@ void Engine::Init(float sr, float* delay_l, float* delay_r, size_t delay_len) {
 
     // Delay = dotted eighth at the current tempo (0.75 s at 60 BPM)
     _fx.Init(sr, delay_l, delay_r, delay_len, 0.75f * 60.f / kDefaultBpm);
+    _comp.Init(sr);
     _VoicePads(true);
 }
 
@@ -34,7 +50,17 @@ void Engine::Process(const float* const* in, float** out, size_t size) {
     const float mix = _mix;
     const float g_plink = sinf(mix * 1.5707963f);   // equal power: centre = both at -3 dB
     const float g_pad   = cosf(mix * 1.5707963f);
-    const float pb = _plink_blend, padb = _pad_blend;
+    const float padb = _pad_blend;
+
+    // S34 follows the knob live on every voice, unless each note holds its own (auto modulation)
+    if (!_auto_mod) {
+        const PlinkTone pt = ToneFor(_plink_tone);
+        for (auto& v : _plinks) v.SetTone(pt);
+    }
+
+    // Touches are handled every block (1 ms), not on the sixteenth grid
+    TouchEvent e;
+    while (_touch_q.Pop(e)) _OnTouch(e);
 
     for (size_t i = 0; i < size; i++) {
         if (++_sample_in_step >= _samples_per_step) {
@@ -45,7 +71,7 @@ void Engine::Process(const float* const* in, float** out, size_t size) {
         float l = 0.f, r = 0.f;
         for (uint8_t v = 0; v < kPlinkVoices; v++) {
             if (!_plinks[v].Active()) continue;
-            float s = _plinks[v].Process(pb);
+            float s = _plinks[v].Process();
             l += s * (1.f - _plink_pan[v]);
             r += s * _plink_pan[v];
         }
@@ -63,9 +89,49 @@ void Engine::Process(const float* const* in, float** out, size_t size) {
         r += pr * g_pad * 1.4f;
 
         _fx.Process(l, r);
-        out[0][i] = daisysp::SoftClip(l * 2.4f);
-        out[1][i] = daisysp::SoftClip(r * 2.4f);
+        l *= 2.4f;
+        r *= 2.4f;
+        _comp.Process(l, r);
+        out[0][i] = daisysp::SoftClip(l);
+        out[1][i] = daisysp::SoftClip(r);
     }
+}
+
+// Touch events (audio callback, once per block) ..................................
+// A strike is a deliberate touch: it plays right away, at the touched pad's pitch, and
+// bypasses the grid and the density filter. Flickers (sensitive field, noise, wires) are
+// texture: they wait for the next sixteenth and go through the filter.
+void Engine::_OnTouch(const TouchEvent& e) {
+    const int size = _tuning.Size();
+    const int pc = e.pad % size;
+    const float intensity = _intensity;
+    // Higher pads, harder strikes and higher overall intensity reach higher octaves
+    const int octave = e.pad / size + (intensity > 0.45f ? 1 : 0) + (intensity > 0.8f ? 1 : 0)
+                     + ((e.kind == TouchEvent::Strike && e.amount > 0.75f) ? 1 : 0);
+
+    if (e.kind == TouchEvent::Flicker) {
+        if ((e.targets & kToPlinks) && _n_flickers < 15) {
+            Candidate c;
+            c.pc     = static_cast<uint8_t>(pc);
+            c.octave = static_cast<int8_t>(octave);
+            c.vel    = 0.12f + 0.35f * e.amount;
+            c.source = Candidate::Flicker;
+            _flickers[_n_flickers++] = c;
+        }
+        return;
+    }
+
+    if (e.targets & kToPlinks) _TriggerPlink(pc + octave * size, 0.3f + 0.7f * e.amount);
+    if (e.targets & kToPads) {
+        // The touched pad becomes the chord root now, and the pads sound for 8 s
+        _harmony.Request(pc);
+        _harmony.ApplyRequest();
+        for (auto& p : _pads) p.Swell(0.15f * e.amount);
+        _steps_since_pad_touch = 0;
+        _pads_on = true;
+        _VoicePads(false);
+    }
+    _gen.SetGravity(pc, 0.6f);
 }
 
 // Sequencer step (every sixteenth, inside the audio callback) .....................
@@ -101,30 +167,11 @@ void Engine::_Step() {
     int chord[4];
     uint8_t chord_n = _harmony.Tones(chord, size);
 
-    // 1. Collect touch events since the last step .................................
+    // 1. Flickers collected since the last step (strikes already played in _OnTouch) ..
     Candidate cands[16];
     uint8_t n = 0;
-    TouchEvent e;
-    while (_touch_q.Pop(e)) {
-        const int pc = e.pad % size;
-        if ((e.targets & kToPlinks) && n < 15) {
-            Candidate c;
-            c.pc     = static_cast<uint8_t>(pc);
-            // Higher pads, harder strikes and higher overall intensity reach higher octaves
-            c.octave = static_cast<int8_t>(e.pad / size
-                        + (intensity > 0.45f ? 1 : 0) + (intensity > 0.8f ? 1 : 0)
-                        + ((e.kind == TouchEvent::Strike && e.amount > 0.75f) ? 1 : 0));
-            c.vel    = (e.kind == TouchEvent::Strike) ? 0.3f + 0.7f * e.amount : 0.12f + 0.35f * e.amount;
-            c.source = (e.kind == TouchEvent::Strike) ? Candidate::Strike : Candidate::Flicker;
-            cands[n++] = c;
-        }
-        if ((e.targets & kToPads) && e.kind == TouchEvent::Strike) {
-            _harmony.Request(pc);
-            for (auto& p : _pads) p.Swell(0.15f * e.amount);
-            _steps_since_pad_touch = 0;
-        }
-        if (e.kind == TouchEvent::Strike) _gen.SetGravity(pc, 0.6f);
-    }
+    for (uint8_t i = 0; i < _n_flickers; i++) cands[n++] = _flickers[i];
+    _n_flickers = 0;
 
     // 2. The autonomous algorithm adds its own candidate ............................
     Candidate a;
@@ -135,11 +182,9 @@ void Engine::_Step() {
     uint8_t k = _filter.Filter(cands, n, step_in_bar, chord, chord_n, size, notes, _rng);
     for (uint8_t i = 0; i < k; i++) _TriggerPlink(notes[i].degree, notes[i].vel);
 
-    // 4. Harmony: touch requests land on the beat, otherwise change every few bars ...
-    const bool on_beat = (step_in_bar % kStepsPerBeat) == 0;
+    // 4. Harmony: change every few bars unless a P10-routed touch picked the chord ....
     bool chord_changed = false;
-    if (on_beat) chord_changed = _harmony.ApplyRequest();
-    if (!chord_changed && step_in_bar == 0 && (_step / kStepsPerBar) % kBarsPerChord == 0
+    if (step_in_bar == 0 && (_step / kStepsPerBar) % kBarsPerChord == 0
         && _steps_since_pad_touch > kStepsPerBar * kBarsPerChord && _step > 0) {
         _harmony.Next(_rng, size);
         chord_changed = true;
@@ -163,7 +208,30 @@ void Engine::_Step() {
     _step++;
 }
 
+// One step of a drunk walk: a random step of up to ±step, reflected at ±limit
+float Engine::_Drunk(float& walk, float step, float limit) {
+    walk += (2.f * _rng.Uni() - 1.f) * step;
+    if (walk > limit)  walk = 2.f * limit - walk;
+    if (walk < -limit) walk = -2.f * limit - walk;
+    return walk;
+}
+
 void Engine::_TriggerPlink(int degree, float vel) {
+    const int size = _tuning.Size();
+    float tone = _plink_tone, shape = _plink_shape;
+
+    // Auto modulation (right switch up): each note samples and holds three drunk walks, plus
+    // a little jitter of its own, so one note rings long, the next is short, some jump an
+    // octave, some are glassier or more driven. The walks keep neighbouring notes related.
+    if (_auto_mod) {
+        degree += size * static_cast<int>(lroundf(_Drunk(_walk_oct, 0.45f, 1.4f)));
+        shape = clamp01(shape + _Drunk(_walk_shape, 0.2f, 0.5f) + 0.3f * (_rng.Uni() - 0.5f));
+        tone  = clamp01(tone  + _Drunk(_walk_tone, 0.15f, 0.4f) + 0.2f * (_rng.Uni() - 0.5f));
+    }
+
+    // Ceiling (left switch): fold notes above it down by octaves, keeping the pitch class
+    const int top  = _ceiling_oct * size;
+    if (degree > top) degree -= size * ((degree - top + size - 1) / size);
     const int note = _tuning.MidiNote(degree, kPlinkBaseMidi);
 
     // Free voice, or steal the quietest
@@ -173,7 +241,8 @@ void Engine::_TriggerPlink(int degree, float vel) {
         float lv = _plinks[v].Active() ? _plinks[v].Level() : -1.f;
         if (lv < best_level) { best_level = lv; best = v; }
     }
-    _plinks[best].Trigger(mtof(note), vel, _plink_shape);
+    _plinks[best].Trigger(mtof(note), vel, shape);
+    _plinks[best].SetTone(ToneFor(tone));
     _plink_pan[best] = 0.25f + 0.5f * _rng.Uni();
 
     for (auto& o : _offs) {
@@ -214,7 +283,7 @@ void Engine::_VoicePads(bool jump) {
         }
         _pad_degree[v] = target;
         const int midi = _tuning.MidiNote(target, kPadBaseMidi);
-        _pads[v].SetNote(mtof(midi), jump);
+        _pads[v].SetNote(mtof(midi));
 
         const bool gate = _pads_on && (v < n);         // shimmer voice is gated in _Step
         if (v < n || !_pads_on) _pads[v].SetGate(gate, v == 0 ? 1.f : 0.8f);

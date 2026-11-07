@@ -9,6 +9,10 @@ using namespace daisysp;
 namespace {
 constexpr uint16_t kTapMaxTicks   = 150;   // < 0.6 s counts as a tap
 constexpr uint16_t kRecalTicks    = 120;   // ~0.5 s both pads held
+constexpr uint16_t kBlinkTicks    = 50;    // 200 ms per blink (100 on, 100 off), distinct from touch flashes
+constexpr uint8_t  kStrikeFlash   = 12;    // ~50 ms LED flash per detected strike
+constexpr uint8_t  kFlickerFlash  = 2;     // ~8 ms per flicker
+constexpr int      kMidiPerLoop   = 4;     // UART TX blocks ~1 ms per message: cap the main-loop stall
 }
 
 void SporeUI::Init(DaisySeed& hw) {
@@ -16,35 +20,43 @@ void SporeUI::Init(DaisySeed& hw) {
 
 #ifdef USB_MIDI
     MidiUsbHandler::Config usb_cfg;
+    // With no app reading the port every TX fails, and each retry burns 100 µs of the main loop
+    usb_cfg.transport_config.tx_retry_count = 1;
     _midi_usb.Init(usb_cfg);
 #endif
 #ifdef UART_MIDI
     // Default UART MIDI pins: USART1, RX = D14 (PB7), TX = D13 (PB6)
     MidiUartHandler::Config uart_cfg;
     _midi_uart.Init(uart_cfg);
+    // libDaisy leaves RX floating. Pull it up to MIDI's idle level, so an unplugged jack
+    // reads as silence instead of noise (PB7 = D14).
+    GPIOB->PUPDR = (GPIOB->PUPDR & ~(3u << (7 * 2))) | (1u << (7 * 2));
     _midi_uart.StartReceive();
 #endif
 }
 
 void SporeUI::Process(DaisySeed& hw) {
-    _ProcessMidi();
-    _touch.Process();          // reads the MPR121, fires OnStrike/OnFlicker
-    _ProcessControls();
-    _ProcessModPads();
-    _UpdateIntensity();
-    _SendNotes();
-    _Led(hw);
+    _beat = _beat + 1;
+    _stage = kStageMidiIn;     _ProcessMidi();
+    _stage = kStageTouch;      _touch.Process();   // reads the MPR121, fires OnStrike/OnFlicker
+    _stage = kStageControls;   _ProcessControls();
+    _stage = kStageModPads;    _ProcessModPads();
+    _stage = kStageIntensity;  _UpdateIntensity();
+    _stage = kStageMidiOut;    _SendNotes();
+    _stage = kStageIdle;       _Led(hw);
 }
 
 // Field → engine ...............................................................
 
 void SporeUI::OnStrike(uint8_t pad, float velocity) {
     _recent = fminf(_recent + 0.12f + 0.25f * velocity, 1.5f);
+    _flash = kStrikeFlash;
     _engine.PushTouch({ TouchEvent::Strike, pad, velocity, _Targets() });
 }
 
 void SporeUI::OnFlicker(uint8_t pad, float amount) {
     _recent = fminf(_recent + 0.02f + 0.04f * amount, 1.5f);
+    if (_flash < kFlickerFlash) _flash = kFlickerFlash;
     // Flickers only ever play plinks; pads are reserved for deliberate strikes
     _engine.PushTouch({ TouchEvent::Flicker, pad, amount, static_cast<uint8_t>(_Targets() & kToPlinks) });
 }
@@ -57,19 +69,16 @@ void SporeUI::_ProcessControls() {
     _engine.SetDelay(k.s31().Process());
     _engine.SetChorus(k.s32().Process());
     _engine.SetPadBlend(k.s33().Process());
-    _engine.SetPlinkBlend(k.s34().Process());
+    _engine.SetPlinkTone(k.s34().Process());
     _engine.SetPlinkShape(k.s35().Process());
     _engine.SetMix(k.s36().Process());
     _touch.field().SetSensitivity(k.s37().Process());
 
     auto a = _touch.switches().A();
-    _engine.SetAutoMode(a == Switch3::POS_UP     ? Generator::Mode::On
-                      : a == Switch3::POS_CENTER ? Generator::Mode::Sparse
-                                                 : Generator::Mode::Off);
+    _engine.SetAutoMode(a == Switch3::POS_DOWN ? Generator::Mode::Off : Generator::Mode::On);
+    _engine.SetAutoMod(a == Switch3::POS_UP);
     auto b = _touch.switches().B();
-    _engine.SetFilterMode(b == Switch3::POS_UP     ? MelodyFilter::Mode::Free
-                        : b == Switch3::POS_CENTER ? MelodyFilter::Mode::Melodic
-                                                   : MelodyFilter::Mode::Strict);
+    _engine.SetCeiling(b == Switch3::POS_UP ? 3 : b == Switch3::POS_CENTER ? 2 : 1);
 }
 
 // P10 / P11 use the fixed "firm" threshold, so they stay reliable whatever the fader says.
@@ -153,7 +162,8 @@ void SporeUI::_HandleMidi(MidiEvent& m) {
 
 void SporeUI::_SendNotes() {
     NoteOut n;
-    while (_engine.PopNoteOut(n)) {
+    int budget = kMidiPerLoop;
+    while (budget-- > 0 && _engine.PopNoteOut(n)) {
         uint8_t msg[3] = {
             static_cast<uint8_t>((n.velocity ? 0x90 : 0x80) | (n.channel & 0x0F)),
             static_cast<uint8_t>(n.note & 0x7F),
@@ -168,17 +178,18 @@ void SporeUI::_SendNotes() {
     }
 }
 
-// LED: short flash per plink; blink patterns confirm toggles/recalibration ...........
+// LED: flash per detected touch (so sensing and sound can be told apart);
+// blink patterns confirm toggles/recalibration .......................................
 
 void SporeUI::_Led(DaisySeed& hw) {
+    // Solid while P10/P11 is held: shows the touch is detected, before the tap registers
+    if (_hold_10 > 0 || _hold_11 > 0) { hw.SetLed(true); return; }
     if (_blink_count > 0) {
-        bool on = (_blink_tick % 20) < 10;
-        if (++_blink_tick >= 20 * _blink_count) { _blink_count = 0; _blink_tick = 0; }
+        bool on = (_blink_tick % kBlinkTicks) < kBlinkTicks / 2;
+        if (++_blink_tick >= kBlinkTicks * _blink_count) { _blink_count = 0; _blink_tick = 0; }
         hw.SetLed(on);
         return;
     }
-    auto count = _engine.NoteCount();
-    if (count != _last_note_count) { _last_note_count = count; _flash = 6; }
     hw.SetLed(_flash > 0);
     if (_flash > 0) _flash--;
 }

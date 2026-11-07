@@ -9,11 +9,12 @@ namespace synthux {
 
 // Controls ..................................................................
 //   S30 reverb      S31 delay       S32 chorus
-//   S33 pad blend   S34 plink blend S35 plink attack/decay
+//   S33 pad blend   S34 plink tone: glass → wood → saturated   S35 plink attack/decay
 //   S36 (left fader)  pads ←→ plinks mix, centre = 50/50
 //   S37 (right fader) field sensitivity: firm touch → presence / antenna
-//   Right switch: autoplay   up = on, centre = sparse, down = off (touch only)
-//   Left switch:  density filter   up = free, centre = melodic, down = strict
+//   Right switch: up = autoplay + per-note random octave, tone (S34) and length (S35),
+//                 centre = autoplay, down = touch only
+//   Left switch:  highest plink note   up = D7, centre = D6, down = D5 (at root D; higher notes fold down)
 //   P00..P09  the field (notes, flickers, intensity)
 //   P10 tap   toggle: field → slow pads (touch picks the next chord root)
 //   P11 tap   toggle: field → plinks
@@ -24,6 +25,15 @@ public:
 
     void Init(daisy::DaisySeed& hw);
     void Process(daisy::DaisySeed& hw);     // ~250 Hz from the main loop
+
+    // Main-loop watchdog, read from the audio callback: Beat() advances every pass,
+    // Stage() says which part of the pass is running (the blink code when it stalls).
+    enum Stage : uint8_t {
+        kStageMidiIn = 1, kStageTouch, kStageControls, kStageModPads,
+        kStageIntensity, kStageMidiOut, kStageIdle,
+    };
+    uint32_t Beat() const  { return _beat; }
+    uint8_t  Stage() const { return _stage; }
 
     // FieldListener
     void OnStrike(uint8_t pad, float velocity) override;
@@ -65,8 +75,11 @@ private:
     float _recent = 0.f;
     float _intensity = 0.f;
 
+    // Watchdog
+    volatile uint32_t _beat = 0;
+    volatile uint8_t  _stage = 0;
+
     // LED
-    uint32_t _last_note_count = 0;
     uint8_t  _flash = 0;
     uint8_t  _blink_count = 0;
     uint16_t _blink_tick = 0;

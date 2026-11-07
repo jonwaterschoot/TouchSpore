@@ -15,10 +15,19 @@ inline float FastSin(float ph) {
 inline float Wrap(float ph) { return ph - static_cast<float>(static_cast<int>(ph)); }
 
 // Plink ......................................................................
-// Two sounds, blended by one knob:
+// Two sounds, blended by the tone knob, then an optional saturator:
 //   A "glass" — soft 2-op FM bell (modulator at 3.5× gives the inharmonic shimmer)
 //   B "wood"  — marimba-ish: fundamental + fast-decaying 4th partial
+//   Drive     — per-voice soft saturation (chords stay clean: no intermodulation between
+//               notes) followed by a one-pole low-pass that closes as drive rises.
 // One knob (shape) moves attack and decay together: snappy pluck → soft swelling bowl.
+struct PlinkTone {
+    float blend  = 0.f;   // 0 = glass … 1 = wood
+    float drive  = 1.f;   // gain into the saturator; 1 = clean (saturator bypassed)
+    float makeup = 1.f;   // level compensation after the saturator
+    float lp     = 1.f;   // one-pole coefficient after the saturator; 1 = open
+};
+
 class PlinkVoice {
 public:
     void Init(float sr) { _sr = sr; _env = 0.f; _stage = Idle; }
@@ -37,8 +46,12 @@ public:
         if (_env > 0.f) _env *= 0.5f;   // retrigger of a stolen voice: soften the click
     }
 
-    float Process(float blend) {
+    // Tone is held per voice, so notes can sound different from each other (auto modulation)
+    void SetTone(const PlinkTone& t) { _tone = t; }
+
+    float Process() {
         if (_stage == Idle) return 0.f;
+        const PlinkTone& t = _tone;
         if (_stage == Attack) {
             _env += _att_inc;
             if (_env >= 1.f) { _env = 1.f; _stage = Decay; }
@@ -57,7 +70,13 @@ public:
         float glass = FastSin(Wrap(_ph_c + index * 0.16f * FastSin(_ph_m) + 1.f));
         float wood  = FastSin(_ph_c) + 0.35f * _bright * _bright * FastSin(_ph_4);
 
-        return (glass + (wood - glass) * blend) * _env * _vel * 0.28f;
+        float s = (glass + (wood - glass) * t.blend) * _env * _vel * 0.28f;
+        if (t.drive > 1.f) {
+            const float x = s * t.drive;
+            s = x / sqrtf(1.f + x * x) * t.makeup;    // smooth, never hard-clips
+        }
+        _lp += (s - _lp) * t.lp;
+        return _lp;
     }
 
     bool  Active() const { return _stage != Idle; }
@@ -69,11 +88,14 @@ private:
     float _ph_c = 0.f, _ph_m = 0.f, _ph_4 = 0.f;
     float _env = 0.f, _att_inc = 0.f, _dec_coef = 0.f;
     float _bright = 0.f, _bright_coef = 0.f;
+    float _lp = 0.f;
+    PlinkTone _tone;
     Stage _stage = Idle;
 };
 
 // Pad ........................................................................
-// Long, slow voice that glides between chord tones instead of re-triggering.
+// Long, slow voice that moves between chord tones without re-triggering.
+// Pitch changes are instant (no glide), so it is always in tune; only the amplitude swells.
 //   A "strings" — three detuned PolyBLEP saws through a slowly breathing low-pass
 //   B "choir"   — sine + octave + soft twelfth, with gentle vibrato
 class PadVoice {
@@ -88,12 +110,11 @@ public:
         _filt.Init(sr);
         _filt.SetRes(0.1f);
         _lfo_inc = lfo_rate / sr;
-        _glide_coef = 1.f - expf(-1.f / (1.2f * sr));        // ~1.2 s glide between chord tones
         _amp_up     = 1.f - expf(-1.f / (2.5f * sr));        // ~2.5 s swell in
         _amp_down   = 1.f - expf(-1.f / (5.0f * sr));        // ~5 s release
     }
 
-    void SetNote(float freq, bool jump = false) { _target = freq; if (jump || _freq <= 0.f) _freq = freq; }
+    void SetNote(float freq)                     { _freq = freq; _ctl = 0; }
     void SetGate(bool on, float level = 1.f)    { _amp_target = on ? level : 0.f; }
     void Swell(float amount)                     { _swell = fminf(_swell + amount, 0.6f); }
     bool Silent() const                          { return _amp < 0.0005f && _amp_target == 0.f; }
@@ -103,19 +124,20 @@ public:
         _swell *= 0.99997f;                                  // swell fades over a few seconds
         if (_amp < 0.0002f && _amp_target == 0.f) return 0.f;
 
-        _freq += (_target - _freq) * _glide_coef;
         _lfo = Wrap(_lfo + _lfo_inc);
         const float lfo = FastSin(_lfo);
 
         float out_a = 0.f, out_b = 0.f;
         if (blend < 0.999f) {
             static constexpr float kDetune[3] = { 0.9960f, 1.f, 1.0040f };
-            float s = 0.f;
-            for (int i = 0; i < 3; i++) {
-                _saw[i].SetFreq(_freq * kDetune[i]);
-                s += _saw[i].Process();
+            // Coefficients at control rate: Svf::SetFreq costs a sinf + powf per call
+            if (_ctl == 0) {
+                for (int i = 0; i < 3; i++) _saw[i].SetFreq(_freq * kDetune[i]);
+                _filt.SetFreq(_freq * (2.5f + 1.5f * lfo) + 300.f);
             }
-            _filt.SetFreq(_freq * (2.5f + 1.5f * lfo) + 300.f);
+            _ctl = (_ctl + 1) & 15;
+            float s = 0.f;
+            for (int i = 0; i < 3; i++) s += _saw[i].Process();
             _filt.Process(s * 0.33f);
             out_a = _filt.Low();
         }
@@ -135,10 +157,11 @@ private:
     float _sr = 48000.f;
     daisysp::Oscillator _saw[3];
     daisysp::Svf _filt;
-    float _freq = 0.f, _target = 0.f, _glide_coef = 0.f;
+    float _freq = 0.f;
     float _amp = 0.f, _amp_target = 0.f, _amp_up = 0.f, _amp_down = 0.f, _swell = 0.f;
     float _lfo = 0.f, _lfo_inc = 0.f;
     float _ph1 = 0.f, _ph2 = 0.f, _ph3 = 0.f;
+    uint8_t _ctl = 0;
 };
 
 } // namespace spore

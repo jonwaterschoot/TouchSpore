@@ -3,6 +3,7 @@
 #include "daisysp.h"
 #include "daisysp-lgpl.h"
 #include <cstddef>
+#include <cmath>
 
 namespace spore {
 
@@ -32,6 +33,40 @@ private:
     float _chorus_wet = 0.f, _delay_wet = 0.f, _delay_fb = 0.f, _reverb_wet = 0.f;
     uint16_t _param_cnt = 0;
     float _sr = 48000.f;
+};
+
+// Stereo-linked bus compressor in front of the final soft clip, so long reverb tails and
+// stacked plinks get turned down instead of driven into the clipper. Peak detector;
+// the gain is computed at control rate (one powf per 16 samples) and smoothed per sample.
+class BusCompressor {
+public:
+    void Init(float sr) {
+        _att    = 1.f - expf(-1.f / (0.002f * sr));    // 2 ms
+        _rel    = 1.f - expf(-1.f / (0.25f * sr));     // 250 ms
+        _smooth = 1.f - expf(-1.f / (0.003f * sr));
+    }
+
+    void Process(float& l, float& r) {
+        const float peak = fmaxf(fabsf(l), fabsf(r));
+        _env += (peak - _env) * (peak > _env ? _att : _rel);
+        if (++_cnt >= 16) {
+            _cnt = 0;
+            // 4:1 above the threshold: gain = (thr / env)^(1 - 1/4)
+            _target = (_env > kThreshold) ? powf(kThreshold / _env, 0.75f) : 1.f;
+        }
+        _gain += (_target - _gain) * _smooth;
+        l *= _gain * kMakeup;
+        r *= _gain * kMakeup;
+    }
+
+private:
+    // Levels are at the soft clip's input, which is close to linear below ~0.5
+    static constexpr float kThreshold = 0.5f;
+    static constexpr float kMakeup    = 1.3f;
+
+    float _att = 0.f, _rel = 0.f, _smooth = 0.f;
+    float _env = 0.f, _gain = 1.f, _target = 1.f;
+    uint8_t _cnt = 0;
 };
 
 } // namespace spore

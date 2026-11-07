@@ -1,8 +1,13 @@
 # Project Name
 TARGET = TouchSpore
 
-# Enabling DEBUG disables USB MIDI (UART MIDI stays on)
+# Enabling DEBUG disables USB MIDI
 # DEBUG = 1
+
+# TRS MIDI on D13/D14, only for boards with the TRS MIDI mod: make UART_MIDI=1
+ifeq ($(UART_MIDI), 1)
+C_DEFS += -DUART_MIDI
+endif
 
 USE_DAISYSP_LGPL = 1
 
@@ -20,12 +25,10 @@ include $(SYSTEM_FILES_DIR)/Makefile
 
 CPP_STANDARD = -std=gnu++17
 
-LDFLAGS += -Wl,--no-warn-rwx-segments
-
 libs:
-	cd $(LIBDAISY_DIR) && $(MAKE)
-	cd $(DAISYSP_DIR) && $(MAKE)
+	cd $(LIBDAISY_DIR) && "$(MAKE)"
+	cd $(DAISYSP_DIR) && "$(MAKE)"
 
 clean-libs:
-	cd $(LIBDAISY_DIR) && $(MAKE) clean
-	cd $(DAISYSP_DIR) && $(MAKE) clean
+	cd $(LIBDAISY_DIR) && "$(MAKE)" clean
+	cd $(DAISYSP_DIR) && "$(MAKE)" clean

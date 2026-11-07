@@ -44,11 +44,13 @@ public:
     void SetDelay(float k)       { _fx.SetDelay(k); }
     void SetChorus(float k)      { _fx.SetChorus(k); }
     void SetPadBlend(float k)    { _pad_blend = k; }
-    void SetPlinkBlend(float k)  { _plink_blend = k; }
+    void SetPlinkTone(float k)   { _plink_tone = k; }    // glass → wood → saturated
+    void SetCeiling(uint8_t oct) { _ceiling_oct = oct; } // highest plink: 1..3 octaves above degree 0
     void SetPlinkShape(float k)  { _plink_shape = k; }
     void SetMix(float k)         { _mix = k; }          // 0 = pads only, 0.5 = equal, 1 = plinks only
     void SetIntensity(float k)   { _intensity = k; }
     void SetAutoMode(Generator::Mode m)    { _gen_mode = m; }
+    void SetAutoMod(bool on)     { _auto_mod = on; }   // per-note random octave, tone and shape
     void SetFilterMode(MelodyFilter::Mode m) { _filter_mode = m; }
     void SetRoot(uint8_t root)   { _pending_root = root % 12; }
     void SetScale(uint8_t scale) { _pending_scale = scale % kScaleCount; }
@@ -60,9 +62,11 @@ public:
 
 private:
     void _Step();
+    void _OnTouch(const TouchEvent& e);
     void _TriggerPlink(int degree, float vel);
     void _VoicePads(bool jump);
     void _SendMidi(uint8_t ch, uint8_t note, uint8_t vel) { _midi_q.Push({ ch, note, vel }); }
+    float _Drunk(float& walk, float step, float limit);
 
     float _sr = 48000.f;
     uint32_t _samples_per_step = 0, _sample_in_step = 0, _step = 0;
@@ -72,7 +76,8 @@ private:
     MelodyFilter _filter;
     Generator    _gen;
     Harmony      _harmony;
-    Fx           _fx;
+    Fx            _fx;
+    BusCompressor _comp;
 
     PlinkVoice _plinks[kPlinkVoices];
     float      _plink_pan[kPlinkVoices] = {};
@@ -84,11 +89,19 @@ private:
     struct PendingOff { uint8_t note; uint8_t steps; };
     PendingOff _offs[16] = {};
 
+    Candidate _flickers[16];          // flicker requests waiting for the next sixteenth
+    uint8_t   _n_flickers = 0;
+
     Spsc<TouchEvent, 64> _touch_q;
     Spsc<NoteOut, 64>    _midi_q;
 
     // Parameters written by the main loop (32-bit stores are atomic on the M7)
-    volatile float _pad_blend = 0.3f, _plink_blend = 0.3f, _plink_shape = 0.3f;
+    volatile float _pad_blend = 0.3f, _plink_tone = 0.3f, _plink_shape = 0.3f;
+    volatile uint8_t _ceiling_oct = 3;
+    volatile bool    _auto_mod = false;
+
+    // Auto modulation (right switch up): drunk walks, sampled and held by each plink
+    float _walk_oct = 0.f, _walk_tone = 0.f, _walk_shape = 0.f;
     volatile float _mix = 0.5f, _intensity = 0.f;
     volatile Generator::Mode    _gen_mode = Generator::Mode::On;
     volatile MelodyFilter::Mode _filter_mode = MelodyFilter::Mode::Melodic;

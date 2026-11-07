@@ -42,7 +42,7 @@ int main(int argc, char** argv) {
     e.SetFilterMode(!strcmp(mode, "free") ? MelodyFilter::Mode::Free
                   : !strcmp(mode, "strict") ? MelodyFilter::Mode::Strict : MelodyFilter::Mode::Melodic);
     e.SetReverb(0.55f); e.SetDelay(0.35f); e.SetChorus(0.4f);
-    e.SetPadBlend(0.4f); e.SetPlinkBlend(0.35f); e.SetPlinkShape(0.35f); e.SetMix(0.55f);
+    e.SetPadBlend(0.4f); e.SetPlinkTone(0.35f); e.SetPlinkShape(0.35f); e.SetMix(0.55f);
 
     Rng rng(1234);
     float bufl[block], bufr[block];
