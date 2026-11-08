@@ -1,13 +1,13 @@
 {
   "target": "TouchSpore",
-  "file": "TouchSpore-dc0f4370cbd5.wasm",
+  "file": "TouchSpore-5900ba1688cd.wasm",
   "abi": "simple-touch-web/1",
-  "sha256": "dc0f4370cbd57fa03823cc0a7437a9b6535103afe60250cbb9978be5537c78dd",
-  "bytes": 107545,
-  "url": "https://raw.githubusercontent.com/jonwaterschoot/TouchSpore/simple-touch-web/TouchSpore-dc0f4370cbd5.wasm",
+  "sha256": "5900ba1688cd364dc7588b101d27d68f6b90518c6b832851c8ffd5b9412e3799",
+  "bytes": 108694,
+  "url": "https://raw.githubusercontent.com/jonwaterschoot/TouchSpore/simple-touch-web/TouchSpore-5900ba1688cd.wasm",
   "source": {
     "repository": "jonwaterschoot/TouchSpore",
-    "commit": "c593c385fdd2904d2a8efc0c50c0ddf6071145db"
+    "commit": "a49ad9394dc8652aee1eb15d5914f9a502bcf175"
   },
-  "built": "2026-11-08T18:59:32.153Z"
+  "built": "2026-11-08T23:26:18.364Z"
 }
