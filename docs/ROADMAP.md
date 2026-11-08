@@ -64,7 +64,7 @@ On the bus there's no conflict: the SSD1306 sits on I2C1 at 0x3C next to the MPR
 - `OledScreen::Init()` must set 400 kHz. libDaisy's driver default is 1 MHz, which the MPR121 is not rated for. `Field` re-inits I2C1 at 400 kHz when reads fail, so the bus stays at 400 kHz after a recovery too.
 - Probe 0x3C once at boot. With no screen fitted, skip all OLED work instead of sending NACKed transfers every pass.
 
-Electrically it is untested. The SSD1306 runs a charge pump, and its supply current follows the number of lit pixels. With S37 low (firm touch, 40 counts) that won't matter. With S37 at the top the threshold drops below the pads' own noise, so extra rail noise becomes flickers. Test in step 3.6.
+Tested 2026-11-08 (step 3.6): no extra flickers. The SSD1306 runs a charge pump, and its supply current follows the number of lit pixels. With S37 low (firm touch, 40 counts) that won't matter. With S37 at the top the threshold drops below the pads' own noise, so extra rail noise would become flickers.
 
 ## Phase 0: room and a CPU number
 
@@ -127,7 +127,7 @@ The CC echo lets the library read and write settings with no TouchSpore-specific
   - idle: scale, chord, an intensity bar
 - [x] 3.4 Measure flash after each screen. Stop adding when free flash drops below 3 KB.
 - [x] 3.5 The watchdog's freeze code stays LED-only: it runs in the audio callback and must not touch I2C.
-- [ ] 3.6 Touch test on hardware, S37 at the top with clips: flicker rate with no screen, with the screen fitted and static, and while it redraws. If the screen adds flickers: lower the contrast, turn the screen off after 30 s idle, recalibrate with the screen fitted.
+- [x] 3.6 Touch test on hardware, S37 at the top (2026-11-08): no extra flickers or jitter with the screen fitted, static or redrawing, and no visible tearing. Tested with wires held onto the pads. Clips only fit the edge pads; for the others, tiny wires in the PCB pad holes. Retest with clips attached that way. If the screen adds flickers then: lower the contrast, turn the screen off after 30 s idle, recalibrate with the screen fitted.
 - [x] 3.7 README: wiring, what each screen shows.
 
 The browser build needs no OLED code of its own: simple-touch-web emulates the SSD1306 at register level and draws what the firmware sends. TouchVink's own web manual re-draws the screens in TypeScript (`oled-mini.ts`); that is not needed here.
@@ -189,7 +189,7 @@ simple-touch-web:
 
 ## Open questions
 
-- Does the OLED add flickers at the top of S37? (3.6)
+- Does the OLED add flickers at the top of S37 with clips attached? Not with held wires (3.6).
 - Is one font enough for the screens, or does the value row need Font_11x18 (+3.4 KB)?
 - Which settings persist: root and scale only, or routing too? (1.4)
 - Panel gesture for the scale, or MIDI and the web page only? (1.6)

@@ -120,7 +120,7 @@ SSD1306 128×32 I2C screen on D11 (SCL) / D12 (SDA), address 0x3C, powered from 
 | 2 | PL: a dot per scale note, lit when a plink plays it. Right: last plink note |
 | 3 | PD: the chord's notes, filled while the pads sound. Right: chord name |
 
-At boot, TOUCHSPORE gets overgrown by branching hyphae (about 1 s). The pads then learn their baselines with the screen running. Untested: whether the screen's charge pump adds flickers with S37 at the top. If it does, recalibrate with the screen fitted.
+At boot, TOUCHSPORE gets overgrown by branching hyphae (about 1 s). The pads then learn their baselines with the screen running. With S37 at the top and wires held onto the pads, the screen added no flickers (not yet tested with clips). If it does on your board, recalibrate with the screen fitted.
 
 ## MIDI (USB; TRS on USART1 with the TRS mod: RX D14, TX D13)
 
