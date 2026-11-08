@@ -1,0 +1,39 @@
+{
+  "format": "simple-touch-manual/3",
+  "firmware": {
+    "name": "TouchSpore",
+    "author": "Jon Waterschoot",
+    "version": "0.1.0",
+    "description": "Generative plinks and pads for the Synthux Simple Touch. Pad touches, hand distance and the noise from plants or wires drive the notes.",
+    "notes": "## TouchSpore\nSource: [jonwaterschoot/TouchSpore](https://github.com/jonwaterschoot/TouchSpore).\n\nP00–P09 are read as a continuous capacitive field, and S37 sets how sensitive it is. With S37 down they need a firm touch. With S37 up they react to a hand 1–2 cm away, and clipped wires or plants act as antennas.\n\n## P10 and P11\n- **P10 tap** · field to slow pads on / off. A strike makes that pad the chord root\n- **P11 tap** · field to plinks on / off (on at boot)\n- **P10 + P11, hold 2.5 s, let go** · recalibrate. Do this after attaching or removing clips\n\nThe labels in the P10 and P11 colours need both pads held:\n- **+ S36** · volume, default 60 %\n- **+ P02–P09** · scale. The pad plays no note, and the LED blinks once for P02, up to 8 times for P09\n- **+ P00** · tap for the next root, press 0.6 s for C\n\nVolume, scale and root are saved. The P10 / P11 routing is not.\n\n## Switches\n- **S09-S10** · highest plink note: left D5, centre D6, right D7 (at root D)\n- **S07-S08** · up autoplay + per-note variation, centre autoplay, down touch only\n\n## MIDI\nIn, CCs on any channel:\n- ch 1–15 notes · play that note on a plink\n- ch 16 note · root\n- CC 20 · root 0–11, C–B\n- CC 21 or Program Change · scale 0–7\n- CC 22–29 · S30–S37, until the knob is moved\n- CC 123 · all notes off\n\nOut: plinks on ch 1, pad chords on ch 2. Over USB, CC 20 and 21 on ch 16 report the root and scale in effect.\n\n## In the browser\nVolume, scale and root aren't saved. Strikes play as on the panel. Flickers, the aura and the top half of S37 do nothing, because the browser's touch chip has no noise.",
+    "repo": "https://github.com/jonwaterschoot/TouchSpore",
+    "authorUrl": "https://github.com/jonwaterschoot"
+  },
+  "labels": {
+    "S30": { "main": "Reverb", "main_2": "amount + size", "midi": "CC 22" },
+    "S31": { "main": "Delay", "main_2": "amount + size", "midi": "CC 23" },
+    "S32": { "main": "Chorus", "main_2": "amount + size", "midi": "CC 24" },
+    "S33": { "main": "Pad timbre", "main_2": "strings / choir", "midi": "CC 25" },
+    "S34": { "main": "Plink tone", "main_2": "glass / wood / drive", "midi": "CC 26" },
+    "S35": { "main": "Plink shape", "main_2": "pluck / bowl", "midi": "CC 27" },
+    "S36": { "main": "Pads / plinks", "main_2": "mix", "m_P10": "Volume", "m_P11": "Volume", "midi": "CC 28" },
+    "S37": { "main": "Sensitivity", "main_2": "firm / 1–2 cm", "midi": "CC 29" },
+    "S09_S10": { "main": "Top plink note", "main_2": "D5 / D6 / D7" },
+    "S07_S08": { "main": "Autoplay", "main_2": "vary / on / off" },
+    "P00": { "main": "Note 1", "m_P10": "Root +1, hold: C", "m_P11": "Root +1, hold: C", "midi": "CC 20 · ch 16 note" },
+    "P01": { "main": "Note 2" },
+    "P02": { "main": "Note 3", "m_P10": "Natural minor", "m_P11": "Natural minor", "midi": "CC 21 = 0 · PC 0" },
+    "P03": { "main": "Note 4", "m_P10": "Dorian", "m_P11": "Dorian", "midi": "CC 21 = 1 · PC 1" },
+    "P04": { "main": "Note 5", "m_P10": "Minor pent.", "m_P11": "Minor pent.", "midi": "CC 21 = 2 · PC 2" },
+    "P05": { "main": "Note 6", "m_P10": "Phrygian", "m_P11": "Phrygian", "midi": "CC 21 = 3 · PC 3" },
+    "P06": { "main": "Note 7", "m_P10": "Major", "m_P11": "Major", "midi": "CC 21 = 4 · PC 4" },
+    "P07": { "main": "Note 8", "m_P10": "Lydian", "m_P11": "Lydian", "midi": "CC 21 = 5 · PC 5" },
+    "P08": { "main": "Note 9", "m_P10": "Major pent.", "m_P11": "Major pent.", "midi": "CC 21 = 6 · PC 6" },
+    "P09": { "main": "Note 10", "m_P10": "Harmonic minor", "m_P11": "Harmonic minor", "midi": "CC 21 = 7 · PC 7" },
+    "P10": { "main": "Field to pads", "main_2": "tap on / off" },
+    "P11": { "main": "Field to plinks", "main_2": "tap on / off" },
+    "OUT": { "main": "Audio out" },
+    "LED": { "main": "Touch / status" }
+  },
+  "modifiers": ["P10", "P11"]
+}

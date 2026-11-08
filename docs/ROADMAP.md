@@ -19,7 +19,8 @@ Built with the Daisy Toolchain against the pinned libDaisy (text + data of the r
 | + hidden volume, compressor change | 120,972 B | 10,100 B |
 | + boot animation | 121,516 B | 9,556 B |
 | + settings storage, scale and root gestures | 125,852 B | 5,220 B |
-| + MIDI notes and knobs in, web manual link (today) | 126,868 B | 4,204 B |
+| + MIDI notes and knobs in, web manual link | 126,868 B | 4,204 B |
+| + `Setup()` / `Loop()` split (today) | 126,876 B | 4,196 B |
 
 The OLED added 12,440 B, more than the 5,096 B estimated from TouchVink's blocking driver. About 7 KB of it is libDaisy's interrupt-driven I2C HAL, which any I2C DMA transfer links in full (slave modes included). Font_6x8 is 1.5 KB, our driver and screen about 2.5 KB.
 
@@ -124,7 +125,7 @@ The firmware makes one telemetry send per pass and skips passes that sent notes,
 - [x] 3.2 Probe 0x3C at boot, 400 kHz from `Field`. One half page per pass.
 - [x] 3.3a One screen, Font_6x8 only (decided 2026-11-08). Row 0: last touched control and its value. Row 1: root and scale. Rows 2–3: one column per scale note (5 or 7), PL row flashes each plink note, PD row shows the chord tones. Right of the grid: last plink note, current chord. Note names use `#` (`C#`, `C#4`): Font_6x8 is ASCII only.
 - [x] 3.3b Boot: `TOUCHSPORE` overgrown by branching hyphae (~1 s), held on screen while Field learns baselines, so the pads calibrate with the screen running.
-- [ ] 3.3 Screens, all from the same state struct as the telemetry (TouchVink does the same, so the screen and the page can't disagree):
+- [x] 3.3 Screens, all from the same state struct as the telemetry (TouchVink does the same, so the screen and the page can't disagree):
   - boot: name and version
   - touched control: name + value in units (reverb %, delay %, highest note D5/D6/D7, sensitivity %)
   - scale and root on change, then "SAVED"
@@ -149,9 +150,9 @@ The route from [guide.html](https://jonwaterschoot.github.io/simple-touch-labels
 - [ ] 4.3 First GitHub release (0.1.0).
 - [ ] 4.4 Directory entry from the designer (Firmware tab › Directory entry…), pull request to the community directory.
 - [ ] 4.5 Labels in the designer: every control, P10/P11 as modifiers, MIDI column (CC 20, 21, 22–29, 123, Program Change, notes), notes. Modes for SW2 if the labels differ per position. Repository kit → `simple-touch-labels.json` at the root, control map in `docs/`.
-- [ ] 4.6 `Setup()` / `Loop()` split with `ST_WEB_FIRMWARE(Setup, Loop)`. Keep storage and the SPI stub out of the browser build. Hardware check after.
-- [ ] 4.7 `node ../simple-touch-web/scripts/build.mjs ../TouchSpore`, then the smoke test. Check the SDRAM delay lines and the `CpuLoadMeter` watchdog on the board.
-- [ ] 4.8 `.github/workflows/browser-build.yml` (simple-touch-web `@v1`).
+- [ ] 4.6 `Setup()` / `Loop()` split with `ST_WEB_FIRMWARE(Setup, Loop)`. Keep storage, the SPI stub and `touch/syscalls.cpp` out of the browser build. The browser `Loop()` ends in `System::Delay(4)`: its clock advances only between passes, so the 4 ms spin would never end. ARM and wasm builds compile. Open: hardware check.
+- [x] 4.7 `node ../simple-touch-web/scripts/build.mjs ../TouchSpore`, then the smoke test (2026-11-08: 105 KB, boots, all 12 pads, OLED, MIDI out). Check the SDRAM delay lines and the `CpuLoadMeter` watchdog on the board.
+- [ ] 4.8 `.github/workflows/browser-build.yml` (simple-touch-web `@v1`). File added. Open: push, then a green run.
 - [ ] 4.9 Listen on the test bench, then approve the build (designer › Find builds › Use this build, `"oled": true` once Phase 3 ships).
 
 Known gap in the browser: the board's MPR121 is noise-free, with a fixed baseline of 720 and the proximity electrode at baseline. Strikes work. Flickers, the aura and the top half of S37 do nothing, because they live on noise. See 5.6.

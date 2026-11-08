@@ -159,12 +159,22 @@ Out: plinks on ch 1, pad chords on ch 2. Over USB, CC 20 and CC 21 on ch 16 repo
 On Windows, run these commands from Git Bash so the make recipes use a POSIX-compatible shell.
 
 ```sh
-git submodule add https://github.com/Synthux-Academy/libDaisy.git lib/libDaisy
-git submodule add https://github.com/electro-smith/DaisySP.git lib/DaisySP
-git submodule update --init --recursive
+git clone --recursive https://github.com/jonwaterschoot/TouchSpore.git
+cd TouchSpore
 make libs -j8 && make -j8 && make program-dfu
 ```
 Flash: ~125 KB of 128 KB.
+
+### Browser build
+
+Needs [simple-touch-web](https://github.com/jonwaterschoot/simple-touch-web) next to this folder and wasi-sdk (see its README). Every push to `main` also builds it on GitHub (`.github/workflows/browser-build.yml`).
+
+```sh
+node ../simple-touch-web/scripts/build.mjs .
+node ../simple-touch-web/test/smoke.mjs build-web/TouchSpore.wasm
+```
+
+The browser has no QSPI flash, so volume, scale and root return to their defaults on every load. Strikes play as on the panel. Flickers, the aura and the top half of S37 do nothing, because the browser's touch chip has no noise.
 
 ### Release
 

@@ -1,0 +1,10 @@
+name: Browser build
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  browser:
+    uses: jonwaterschoot/simple-touch-web/.github/workflows/build-firmware.yml@v1
+    permissions:
+      contents: write

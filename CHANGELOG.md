@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.1.0 (2026-11-08)
 
-First release, planned as 0.1.0.
+First release.
 
 ### Added
 
@@ -23,6 +23,7 @@ First release, planned as 0.1.0.
 - Added TRS MIDI for boards with the TRS mod: build with `make UART_MIDI=1`. Off by default, because a floating D14 on stock boards froze the controls.
 - Added LED freeze codes: 1–8 blinks name the main-loop stage that is stuck (see README).
 - Added `make release VERSION=x.y.z`: writes `build/touchspore-vX.Y.Z.bin`.
+- Added a browser build (simple-touch-web): settings are not saved there, and flickers and the aura do nothing.
 
 ### Tested on hardware
 

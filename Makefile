@@ -15,6 +15,12 @@ USE_DAISYSP_LGPL = 1
 CPP_SOURCES = TouchSpore.cpp common/spi_stub.cpp $(wildcard touch/*.cpp) $(wildcard engine/*.cpp) $(wildcard ui/*.cpp) $(wildcard display/*.cpp)
 C_INCLUDES = -Ilib/ -Icommon/ -Itouch/ -Iengine/ -Iui/ -Idisplay/
 
+# simple-touch-web sets SIMPLE_TOUCH_WEB=1. Both files replace symbols of the ARM build
+# (libDaisy's SPI init, newlib's syscalls) that don't exist in WebAssembly.
+ifdef SIMPLE_TOUCH_WEB
+CPP_SOURCES := $(filter-out common/spi_stub.cpp touch/syscalls.cpp,$(CPP_SOURCES))
+endif
+
 # Library Locations
 LIBDAISY_DIR = lib/libDaisy/
 DAISYSP_DIR = lib/DaisySP/
