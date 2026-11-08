@@ -145,15 +145,15 @@ The route from [guide.html](https://jonwaterschoot.github.io/simple-touch-labels
 
 - [x] 4.1a MIT LICENSE, README License section with the DaisySP-LGPL note.
 - [ ] 4.1b TouchString has no license file (nor do TouchBloop, TouchBass and TouchFX). Synthux uses MIT on AudreyTouch, Audrey II and Spotykach. Issue on TouchString asking for one. Once it is MIT, drop the TouchString exclusion from the README's License section.
-- [ ] 4.1c Make the repo public.
+- [x] 4.1c Make the repo public (2026-11-08).
 - [x] 4.2 `make release VERSION=x.y.z` → `build/touchspore-vX.Y.Z.bin` (lowercase, versioned, as the directory asks). Release steps in the README, changes in [CHANGELOG.md](../CHANGELOG.md).
-- [ ] 4.3 First GitHub release (0.1.0).
+- [x] 4.3 First GitHub release (0.1.0, 2026-11-08).
 - [ ] 4.4 Directory entry from the designer (Firmware tab › Directory entry…), pull request to the community directory.
 - [ ] 4.5 Labels in the designer: every control, P10/P11 as modifiers, MIDI column (CC 20, 21, 22–29, 123, Program Change, notes), notes. Modes for SW2 if the labels differ per position. Repository kit → `simple-touch-labels.json` at the root, control map in `docs/`.
 - [x] 4.6 `Setup()` / `Loop()` split with `ST_WEB_FIRMWARE(Setup, Loop)`. Keep storage, the SPI stub and `touch/syscalls.cpp` out of the browser build. The browser `Loop()` ends in `System::Delay(4)`: its clock advances only between passes, so the 4 ms spin would never end. ARM and wasm builds compile. Hardware check passed (2026-11-08). The browser build arms recalibrate after 10 s instead of 2.5 s, because reaching a third control with a mouse takes longer and an armed recalibration refuses the gestures.
 - [x] 4.7 `node ../simple-touch-web/scripts/build.mjs ../TouchSpore`, then the smoke test (2026-11-08: 105 KB, boots, all 12 pads, OLED, MIDI out). Check the SDRAM delay lines and the `CpuLoadMeter` watchdog on the board.
 - [x] 4.8 `.github/workflows/browser-build.yml` (simple-touch-web `@v1`). First run green (2026-11-08). A Windows build's hash differs from CI's: only the compiler version string in the `producers` section changes.
-- [ ] 4.9 Listen on the test bench, then approve the build (designer › Find builds › Use this build, `"oled": true` once Phase 3 ships).
+- [x] 4.9 Listen on the test bench, then approve the build (designer › Find builds › Use this build, `"oled": true` once Phase 3 ships). Approved 2026-11-08: `TouchSpore-5f3bb1a151d6.wasm`, gestures tested on the bench.
 
 Known gap in the browser: the board's MPR121 is noise-free, with a fixed baseline of 720 and the proximity electrode at baseline. Strikes work. Flickers, the aura and the top half of S37 do nothing, because they live on noise. See 5.6.
 

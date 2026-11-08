@@ -35,5 +35,12 @@
     "OUT": { "main": "Audio out" },
     "LED": { "main": "Touch / status" }
   },
-  "modifiers": ["P10", "P11"]
+  "modifiers": ["P10", "P11"],
+  "emulator": {
+    "wasm": "https://raw.githubusercontent.com/jonwaterschoot/TouchSpore/simple-touch-web/TouchSpore-5f3bb1a151d6.wasm",
+    "abi": "simple-touch-web/1",
+    "sha256": "5f3bb1a151d62f830ffcfd92954c357966157ec65fb139202f0b5906d3670a51",
+    "embed": "allowed",
+    "oled": true
+  }
 }
