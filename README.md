@@ -151,3 +151,14 @@ Host simulation (no hardware): see the header of `tools/sim.cpp`.
 `touch/knobs.*`, `touch/switches.*`, `touch/syscalls.cpp`, `common/nocopy.h`, project layout and
 MPR121 register setup from [TouchString](https://github.com/Synthux-Academy/TouchString)
 (Vlad Litvinenko, Rosa Schuurmans, Vincent Maurer).
+
+## License
+
+The TouchSpore code is released under the [MIT License](LICENSE).
+
+It builds on:
+
+- [libDaisy (Synthux fork)](https://github.com/Synthux-Academy/libDaisy) and [DaisySP](https://github.com/electro-smith/DaisySP): MIT License.
+- [DaisySP-LGPL](https://github.com/electro-smith/DaisySP-LGPL) for the reverb (`ReverbSc`, `USE_DAISYSP_LGPL = 1` in the Makefile): LGPL-2.1. The firmware (`.bin`) contains it, so for that part the `.bin` falls under the LGPL. Its source comes with the DaisySP submodule, and this repository has everything needed to rebuild the `.bin` with a changed version of it (see [Build](#build)).
+
+Not covered by the MIT License: the files taken from TouchString (listed under [Credits](#credits)). TouchString has no license file, so they stay under their authors' terms until Synthux Academy adds a license or they are rewritten.
