@@ -36,9 +36,12 @@ constexpr float    kKnobTakeback  = 0.02f; // a knob held by MIDI returns to the
 constexpr uint16_t kLinkTicks     = 2500;  // ~10 s after the last REQUEST: frames stop
 constexpr uint8_t  kLinkBeatTicks = 125;   // ~500 ms: everything re-sent while linked
 constexpr uint8_t  kFrameTicks    = 8;     // ~33 ms: fastest rate per frame type
+constexpr uint8_t  kOledTicks     = 2;     // ~8 ms per half page: a full screen in ~64 ms
 
 // SysEx bodies, without F0 and F7 (libDaisy strips those)
 const uint8_t kRequest[5] = { 0x7D, 0x53, 0x50, 0x01, 0x7E };
+const uint8_t kTouch[5]   = { 0x7D, 0x53, 0x50, 0x01, 0x02 };   // then one force per pad, 0..127
+constexpr size_t kPads = 12;
 
 const char* const kKnobLabels[8] = {
     "REVERB", "DELAY", "CHORUS", "PAD BLEND", "TONE", "ATTACK/DECAY", "MIX", "SENSE",
@@ -465,10 +468,15 @@ void SporeUI::_HandleMidi(MidiEvent& m) {
             break;
         }
         case SystemCommon:
-            if (m.sc_type == SystemExclusive && m.sysex_message_len == sizeof(kRequest)
-                && memcmp(m.sysex_data, kRequest, sizeof(kRequest)) == 0) {
+            if (m.sc_type != SystemExclusive) break;
+            if (m.sysex_message_len == sizeof(kRequest) && memcmp(m.sysex_data, kRequest, sizeof(kRequest)) == 0) {
                 _link_ticks = kLinkTicks;
                 _ResendLink();
+                _oled.SetMirror(true);
+                _oled.MirrorAll();
+                _screen.Redraw();   // with no screen fitted the buffer may never have been drawn
+            } else if (m.sysex_message_len == sizeof(kTouch) + kPads && memcmp(m.sysex_data, kTouch, sizeof(kTouch)) == 0) {
+                for (size_t i = 0; i < kPads; i++) _touch.field().SetPress(i, m.sysex_data[sizeof(kTouch) + i] / 127.f);
             }
             break;
         default: break;
@@ -511,8 +519,9 @@ void SporeUI::_SendLink([[maybe_unused]] bool notes_sent) {
 #ifdef USB_MIDI
     if (_live_wait > 0)  _live_wait--;
     if (_state_wait > 0) _state_wait--;
+    if (_oled_wait > 0)  _oled_wait--;
     if (_link_ticks > 0) {
-        _link_ticks--;
+        if (--_link_ticks == 0) _oled.SetMirror(false);
         if (++_link_beat >= kLinkBeatTicks) _ResendLink();
     }
 
@@ -568,6 +577,16 @@ void SporeUI::_SendLink([[maybe_unused]] bool notes_sent) {
             frame[17] = 0xF7;
             _midi_usb.SendMessage(frame, sizeof(frame));
             _state_wait = kFrameTicks;
+            return;
+        }
+    }
+
+    if (_oled_wait == 0) {
+        uint8_t frame[Oled::kMirrorFrameBytes];
+        const int n = _oled.MirrorFrame(frame);
+        if (n > 0) {
+            _midi_usb.SendMessage(frame, n);
+            _oled_wait = kOledTicks;
         }
     }
 #endif

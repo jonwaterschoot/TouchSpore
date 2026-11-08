@@ -22,6 +22,7 @@ public:
     void SetHarmony(uint8_t root, uint8_t scale, uint8_t chord_root, uint8_t chord_tones);
 
     void Draw();   // once per pass: redraws the frame buffer if anything changed
+    void Redraw() { _dirty = true; }
 
 private:
     int _Column(uint8_t midi) const;   // scale-note column of a MIDI note, -1 if not in the scale

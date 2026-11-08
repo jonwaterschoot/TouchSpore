@@ -108,7 +108,7 @@ void SporeScreen::Draw() {
     for (auto& a : _plink_age) {
         if (a > 0 && --a == 0) _dirty = true;
     }
-    if (!_dirty || !_oled.Present()) return;
+    if (!_dirty || !_oled.Drawing()) return;
     _dirty = false;
 
     Oled& o = _oled;
