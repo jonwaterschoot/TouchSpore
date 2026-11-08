@@ -115,6 +115,11 @@ void Engine::_OnTouch(const TouchEvent& e) {
         _TriggerPlink(0, e.amount);
         return;
     }
+    if (e.kind == TouchEvent::Note) {
+        // Not sent back out over MIDI, so a host that loops our output can't retrigger it
+        _PlayPlink(e.pad, e.amount, _plink_shape, _plink_tone);
+        return;
+    }
 
     const int size = _tuning.Size();
     const int pc = e.pad % size;
@@ -248,16 +253,7 @@ void Engine::_TriggerPlink(int degree, float vel) {
     if (degree > top) degree -= size * ((degree - top + size - 1) / size);
     const int note = _tuning.MidiNote(degree, kPlinkBaseMidi);
 
-    // Free voice, or steal the quietest
-    uint8_t best = 0;
-    float best_level = 2.f;
-    for (uint8_t v = 0; v < kPlinkVoices; v++) {
-        float lv = _plinks[v].Active() ? _plinks[v].Level() : -1.f;
-        if (lv < best_level) { best_level = lv; best = v; }
-    }
-    _plinks[best].Trigger(mtof(note), vel, shape);
-    _plinks[best].SetTone(ToneFor(tone));
-    _plink_pan[best] = 0.25f + 0.5f * _rng.Uni();
+    _PlayPlink(note, vel, shape, tone);
 
     for (auto& o : _offs) {
         if (o.steps == 0) {
@@ -268,6 +264,19 @@ void Engine::_TriggerPlink(int degree, float vel) {
         }
     }
     _note_count++;
+}
+
+void Engine::_PlayPlink(int note, float vel, float shape, float tone) {
+    // Free voice, or steal the quietest
+    uint8_t best = 0;
+    float best_level = 2.f;
+    for (uint8_t v = 0; v < kPlinkVoices; v++) {
+        float lv = _plinks[v].Active() ? _plinks[v].Level() : -1.f;
+        if (lv < best_level) { best_level = lv; best = v; }
+    }
+    _plinks[best].Trigger(mtof(note), vel, shape);
+    _plinks[best].SetTone(ToneFor(tone));
+    _plink_pan[best] = 0.25f + 0.5f * _rng.Uni();
 }
 
 // Voice-led chord placement for the pad synth

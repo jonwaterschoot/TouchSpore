@@ -61,10 +61,14 @@ private:
     void _PickRoot(uint8_t root);
     void _MidiRoot(uint8_t root);
     void _MidiScale(uint8_t scale);
+    void _MidiKnob(uint8_t knob, float value);
     void _UpdateIntensity();
     void _ProcessMidi();
     void _HandleMidi(daisy::MidiEvent& m);
-    void _SendNotes();
+    bool _SendNotes();                      // true if any message went out this pass
+    void _SendLink(bool notes_sent);
+    void _ResendLink();
+    void _SendCc(uint8_t cc, uint8_t value);
     void _Blink(uint8_t count) { _blink_count = count; _blink_tick = 0; }
     void _Led(daisy::DaisySeed& hw);
 
@@ -106,6 +110,20 @@ private:
     uint8_t  _root_pick = spore::kDefaultRoot;
     uint16_t _midi_save_wait = 0;     // passes until a root or scale sent over MIDI is saved
     bool     _save_pending = false;   // set when a gesture ends, written in kStageIdle
+
+    // CC 22..29 hold a knob at the MIDI value until the physical knob leaves _midi_anchor
+    float    _panel[8] = {};          // physical positions on the last pass
+    float    _midi_value[8] = {};
+    float    _midi_anchor[8] = {};
+    uint8_t  _midi_knobs = 0;         // bit per knob: held by MIDI
+
+    // Web manual link (_SendLink). The _sent_* arrays hold the last frame payloads.
+    uint8_t  _sent_root = 0, _sent_scale = 0;
+    uint8_t  _sent_live[4] = {};
+    uint8_t  _sent_state[11] = {};
+    uint16_t _link_ticks = 0;         // passes left of the frames, 0 = no page connected
+    uint8_t  _link_beat = 0;
+    uint8_t  _live_wait = 0, _state_wait = 0;
 
 #ifdef USB_MIDI
     daisy::MidiUsbHandler  _midi_usb;

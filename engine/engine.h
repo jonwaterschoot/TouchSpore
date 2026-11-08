@@ -15,10 +15,11 @@ enum Target : uint8_t { kToPads = 1, kToPlinks = 2 };
 
 // Main loop → audio: something happened on the field
 struct TouchEvent {
-    enum Kind : uint8_t { Strike, Flicker, Root };   // Root: set the root now and play it on a plink
+    // Root: set the root now and play it on a plink. Note: play a MIDI note on a plink.
+    enum Kind : uint8_t { Strike, Flicker, Root, Note };
     Kind    kind;
-    uint8_t pad;       // for Root: the new root, 0–11
-    float   amount;    // velocity for strikes, fluctuation amount for flickers
+    uint8_t pad;       // for Root: the new root, 0–11. For Note: the MIDI note
+    float   amount;    // velocity for strikes and notes, fluctuation amount for flickers
     uint8_t targets;   // Target bitmask from P10/P11 routing
 };
 
@@ -74,6 +75,7 @@ private:
     void _Step();
     void _OnTouch(const TouchEvent& e);
     void _TriggerPlink(int degree, float vel);
+    void _PlayPlink(int note, float vel, float shape, float tone);
     void _VoicePads(bool jump);
     void _SendMidi(uint8_t ch, uint8_t note, uint8_t vel) { _midi_q.Push({ ch, note, vel }); }
     float _Drunk(float& walk, float step, float limit);

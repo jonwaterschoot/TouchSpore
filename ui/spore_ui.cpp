@@ -1,5 +1,6 @@
 #include "spore_ui.h"
 #include "daisysp.h"
+#include <cstring>
 
 using namespace synthux;
 using namespace spore;
@@ -25,10 +26,22 @@ constexpr uint8_t  kFirstScalePad = 2;     // P02..P09 pick scales 0..7. P01 is 
 constexpr uint8_t  kScalePads     = 8;
 constexpr float    kRootPlinkVel  = 0.7f;
 constexpr uint16_t kMidiSaveTicks = 1250;  // ~5 s after the last root or scale sent over MIDI
+constexpr float    kKnobTakeback  = 0.02f; // a knob held by MIDI returns to the panel past 2 %
+constexpr uint16_t kLinkTicks     = 2500;  // ~10 s after the last REQUEST: frames stop
+constexpr uint8_t  kLinkBeatTicks = 125;   // ~500 ms: everything re-sent while linked
+constexpr uint8_t  kFrameTicks    = 8;     // ~33 ms: fastest rate per frame type
+
+// SysEx bodies, without F0 and F7 (libDaisy strips those)
+const uint8_t kRequest[5] = { 0x7D, 0x53, 0x50, 0x01, 0x7E };
 
 const char* const kKnobLabels[8] = {
     "REVERB", "DELAY", "CHORUS", "PAD BLEND", "TONE", "ATTACK/DECAY", "MIX", "SENSE",
 };
+
+// Wire format of the live frame: 0 = up, 1 = centre, 2 = down
+uint8_t WirePos(int pos) {
+    return pos == Switch3::POS_DOWN ? 2 : pos == Switch3::POS_CENTER ? 1 : 0;
+}
 }
 
 void SporeUI::Init(DaisySeed& hw) {
@@ -38,6 +51,8 @@ void SporeUI::Init(DaisySeed& hw) {
     _root_pick  = saved.root;
     _scale_pick = saved.scale;
     _volume     = saved.volume;
+    _sent_root  = saved.root;     // no port is open yet: a page asks with REQUEST
+    _sent_scale = saved.scale;
 
 #ifdef USB_MIDI
     MidiUsbHandler::Config usb_cfg;
@@ -66,7 +81,7 @@ void SporeUI::Process(DaisySeed& hw) {
     _stage = kStageControls;   _ProcessControls();
     _stage = kStageModPads;    _ProcessModPads();
     _stage = kStageIntensity;  _UpdateIntensity();
-    _stage = kStageMidiOut;    _SendNotes();
+    _stage = kStageMidiOut;    _SendLink(_SendNotes());
     _stage = kStageIdle;
     _screen.SetHarmony(_engine.Root(), _engine.Scale(), _engine.ChordRoot(), _engine.ChordTones());
     _screen.Draw();
@@ -104,10 +119,16 @@ void SporeUI::OnFlicker(uint8_t pad, float amount) {
 
 void SporeUI::_ProcessControls() {
     auto& k = _touch.knobs();
-    const float v[8] = {
+    float v[8] = {
         k.s30().Process(), k.s31().Process(), k.s32().Process(), k.s33().Process(),
         k.s34().Process(), k.s35().Process(), k.s36().Process(), k.s37().Process(),
     };
+    for (int i = 0; i < 8; i++) {
+        _panel[i] = v[i];
+        if (!(_midi_knobs & (1u << i))) continue;
+        if (fabsf(v[i] - _midi_anchor[i]) > kKnobTakeback) _midi_knobs &= ~(1u << i);
+        else v[i] = _midi_value[i];
+    }
     _engine.SetReverb(v[0]);
     _engine.SetDelay(v[1]);
     _engine.SetChorus(v[2]);
@@ -381,6 +402,12 @@ void SporeUI::_MidiScale(uint8_t scale) {
     }
 }
 
+void SporeUI::_MidiKnob(uint8_t knob, float value) {
+    _midi_value[knob]  = value;
+    _midi_anchor[knob] = _panel[knob];
+    _midi_knobs |= 1u << knob;
+}
+
 // Intensity: how much is happening on the field. Rises fast, falls slowly.
 void SporeUI::_UpdateIntensity() {
     auto& f = _touch.field();
@@ -414,25 +441,40 @@ void SporeUI::_HandleMidi(MidiEvent& m) {
             auto cc = m.AsControlChange();
             if (cc.control_number == kCcRoot)       _MidiRoot(cc.value % 12);
             else if (cc.control_number == kCcScale) _MidiScale(cc.value);
-            else if (cc.control_number == 123)      _engine.AllNotesOff();
+            else if (cc.control_number >= kCcFirstKnob && cc.control_number < kCcFirstKnob + 8)
+                _MidiKnob(cc.control_number - kCcFirstKnob, cc.value / 127.f);
             break;
         }
+        case ChannelMode:   // libDaisy delivers CC 120–127 as this type
+            if (m.AsChannelMode().event_type == AllNotesOff) _engine.AllNotesOff();
+            break;
         case ProgramChange:
             _MidiScale(m.AsProgramChange().program);
             break;
         case NoteOn: {
             auto on = m.AsNoteOn();
-            if (m.channel == kRootNoteChannel && on.velocity > 0) _MidiRoot(on.note % 12);
+            if (on.velocity == 0) break;
+            if (m.channel == kRootNoteChannel) _MidiRoot(on.note % 12);
+            else _engine.PushTouch({ TouchEvent::Note, on.note, on.velocity / 127.f, 0 });
             break;
         }
+        case SystemCommon:
+            if (m.sc_type == SystemExclusive && m.sysex_message_len == sizeof(kRequest)
+                && memcmp(m.sysex_data, kRequest, sizeof(kRequest)) == 0) {
+                _link_ticks = kLinkTicks;
+                _ResendLink();
+            }
+            break;
         default: break;
     }
 }
 
-void SporeUI::_SendNotes() {
+bool SporeUI::_SendNotes() {
     NoteOut n;
     int budget = kMidiPerLoop;
+    bool sent = false;
     while (budget-- > 0 && _engine.PopNoteOut(n)) {
+        sent = true;
         _screen.OnNote(n);
         uint8_t msg[3] = {
             static_cast<uint8_t>((n.velocity ? 0x90 : 0x80) | (n.channel & 0x0F)),
@@ -446,6 +488,90 @@ void SporeUI::_SendNotes() {
         _midi_uart.SendMessage(msg, 3);
 #endif
     }
+    return sent;
+}
+
+void SporeUI::_ResendLink() {
+    _sent_root = _sent_scale = 0xFF;      // not valid MIDI data, so these always differ
+    _sent_live[0] = _sent_state[0] = 0xFF;
+    _live_wait = _state_wait = 0;
+    _link_beat = 0;
+}
+
+// Web manual link, USB only: on TRS the echo would reach downstream gear and block ~1 ms
+// per message. Root and scale echo on change. The frames run for 10 s after each REQUEST,
+// because with no app reading the port every failed send costs 100 µs of the main loop.
+void SporeUI::_SendLink([[maybe_unused]] bool notes_sent) {
+#ifdef USB_MIDI
+    if (_live_wait > 0)  _live_wait--;
+    if (_state_wait > 0) _state_wait--;
+    if (_link_ticks > 0) {
+        _link_ticks--;
+        if (++_link_beat >= kLinkBeatTicks) _ResendLink();
+    }
+
+    // The USB endpoint holds one transfer at a time, and SendMessage can't report a drop.
+    // One send per pass keeps it free. The notes go first, the rest waits a pass.
+    if (notes_sent) return;
+
+    const uint8_t root  = _engine.Root();
+    const uint8_t scale = _engine.Scale();
+    if (root != _sent_root) {
+        _sent_root = root;
+        _SendCc(kCcRoot, root);
+        return;
+    }
+    if (scale != _sent_scale) {
+        _sent_scale = scale;
+        _SendCc(kCcScale, scale);
+        return;
+    }
+    if (_link_ticks == 0) return;
+
+    if (_live_wait == 0) {
+        auto& f = _touch.field();
+        uint16_t pads = 0;
+        for (uint8_t i = 0; i < 12; i++) {
+            if (f.IsFirmTouched(i)) pads |= 1u << i;
+        }
+        const uint8_t live[4] = {
+            WirePos(_sw_b), WirePos(_sw_a),   // SW1 is the left switch, SW2 the right
+            static_cast<uint8_t>(pads & 0x7F), static_cast<uint8_t>(pads >> 7),
+        };
+        if (memcmp(live, _sent_live, sizeof(live)) != 0) {
+            memcpy(_sent_live, live, sizeof(live));
+            uint8_t frame[10] = { 0xF0, 0x7D, 0x53, 0x54, 0x01 };
+            memcpy(frame + 5, live, sizeof(live));
+            frame[9] = 0xF7;
+            _midi_usb.SendMessage(frame, sizeof(frame));
+            _live_wait = kFrameTicks;
+            return;
+        }
+    }
+
+    if (_state_wait == 0) {
+        uint8_t state[11];
+        for (int i = 0; i < 8; i++) state[i] = static_cast<uint8_t>(_shown[i] * 127.f + 0.5f);
+        state[8]  = root;
+        state[9]  = scale;
+        state[10] = _Targets();   // bit 0 = field → pads, bit 1 = field → plinks
+        if (memcmp(state, _sent_state, sizeof(state)) != 0) {
+            memcpy(_sent_state, state, sizeof(state));
+            uint8_t frame[18] = { 0xF0, 0x7D, 0x53, 0x50, 0x01, 0x01 };
+            memcpy(frame + 6, state, sizeof(state));
+            frame[17] = 0xF7;
+            _midi_usb.SendMessage(frame, sizeof(frame));
+            _state_wait = kFrameTicks;
+        }
+    }
+#endif
+}
+
+void SporeUI::_SendCc([[maybe_unused]] uint8_t cc, [[maybe_unused]] uint8_t value) {
+#ifdef USB_MIDI
+    uint8_t msg[3] = { static_cast<uint8_t>(0xB0 | kLinkChannel), cc, value };
+    _midi_usb.SendMessage(msg, 3);
+#endif
 }
 
 // LED: flash per detected touch (so sensing and sound can be told apart);

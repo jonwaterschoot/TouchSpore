@@ -142,10 +142,17 @@ At boot, TOUCHSPORE gets overgrown by branching hyphae (about 1 s). The pads the
 TRS MIDI is off by default: it was causing errors, if you modded your Simple Touch with trs, build with `make UART_MIDI=1`. On a stock Simple Touch D14 floats, and the noise on it made libDaisy's UART error handling
 starve the main loop (all controls froze while audio kept playing, freeze code 1).
 
-In: CC 20 = root (0–11, C–B), CC 21 or Program Change = scale, Note On on ch 16 = root, CC 123 = all off.
+In: Note On on ch 1–15 plays that note on a plink, Note On on ch 16 = root, CC 20 = root (0–11, C–B), CC 21 or Program Change = scale, CC 22–29 = S30–S37, CC 123 = all off. CCs work on any channel. A knob set by MIDI stays at that value until you move the knob.
 Scales: 0 natural minor (default, root D), 1 dorian, 2 minor pent, 3 phrygian, 4 major, 5 lydian,
 6 major pent, 7 harmonic minor.
-Out: plinks on ch 1, pad chords on ch 2.
+Out: plinks on ch 1, pad chords on ch 2. Over USB, CC 20 and CC 21 on ch 16 report the root and scale in effect after every change.
+
+**Web manual link (USB):** send `F0 7D 53 50 01 7E F7` every 3 s. TouchSpore answers with CC 20 and CC 21 on ch 16, then sends two SysEx frames on change (at most every 33 ms each, and every 500 ms regardless). The frames stop 10 s after the last request.
+
+| Frame | Bytes |
+|---|---|
+| Live | `F0 7D 53 54 01 <SW1> <SW2> <P00–P06> <P07–P11> F7`. Switches: 0 up, 1 centre, 2 down. One bit per firm-touched pad |
+| State | `F0 7D 53 50 01 01 <S30–S37> <root> <scale> <routing> F7`. Knobs 0–127. Routing: bit 0 = pads, bit 1 = plinks |
 
 ## Build
 

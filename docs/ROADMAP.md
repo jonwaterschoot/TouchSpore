@@ -18,11 +18,12 @@ Built with the Daisy Toolchain against the pinned libDaisy (text + data of the r
 | + OLED: DMA driver, Font_6x8, screen | 120,308 B | 10,764 B |
 | + hidden volume, compressor change | 120,972 B | 10,100 B |
 | + boot animation | 121,516 B | 9,556 B |
-| + settings storage, scale and root gestures (today) | 125,852 B | 5,220 B |
+| + settings storage, scale and root gestures | 125,852 B | 5,220 B |
+| + MIDI notes and knobs in, web manual link (today) | 126,868 B | 4,204 B |
 
 The OLED added 12,440 B, more than the 5,096 B estimated from TouchVink's blocking driver. About 7 KB of it is libDaisy's interrupt-driven I2C HAL, which any I2C DMA transfer links in full (slave modes included). Font_6x8 is 1.5 KB, our driver and screen about 2.5 KB.
 
-Settings storage and the scale and root gestures added 4,336 B. Still to come: the SysEx telemetry and settings echo (estimated 1.7–2.7 KB). Expected end state: 127.5–128.5 KB, so 2.5–3.5 KB free.
+Settings storage and the scale and root gestures added 4,336 B. The MIDI link added 1,016 B (estimated 1.7–2.7 KB): libDaisy's parser and SysEx packing were already linked.
 
 If it gets too tight:
 
@@ -81,7 +82,7 @@ Tested 2026-11-08 (step 3.6): no extra flickers. The SSD1306 runs a charge pump,
 Scale and root come from the panel gestures or MIDI (CC 20, CC 21, Program Change, Note On ch 16). Volume, root and scale load from QSPI at boot.
 
 - [x] 1.1 `Settings { version, root, scale, volume }` in `PersistentStorage` at QSPI offset 0x7F0000 (`ui/spore_settings.*`). Loaded before `engine.Init()`. Blank, foreign or out-of-range data loads as defaults.
-- [ ] 1.1b Hardware check: values survive a power cycle, flicker after a save, audio doesn't drop during a save, A → B → A on the scale ends on A after a reboot. Check that a saved quiet volume doesn't start loud, that P02–P09 and P00 pick only with P10 + P11 held, that holding P10 + P11 with hands near the pads picks nothing by itself, that P00 taps step the root with a plink and a 0.6 s press gives C, and that root and scale sent over MIDI survive a reboot.
+- [x] 1.1b Hardware check (2026-11-08): values survive a power cycle, flicker after a save, audio doesn't drop during a save, A → B → A on the scale ends on A after a reboot. A saved quiet volume doesn't start loud, P02–P09 and P00 pick only with P10 + P11 held, holding P10 + P11 with hands near the pads picks nothing by itself, P00 taps step the root with a plink and a 0.6 s press gives C. Root and scale sent over MIDI survive a reboot.
 - [x] 1.2 `Engine::Root()` / `Engine::Scale()` getters (the values in effect, after `_pending_*` is applied in the audio callback).
 - [x] 1.3 Save when a volume, scale or root gesture ends, from the main loop (decided 2026-11-08: they are deliberate and happen outside playing). Root and scale sent over MIDI save 5 s after the last change (the web manual will set them this way). LED: fast flicker for 0.5 s when saved. libDaisy skips the cache invalidate for apps in internal flash, so `SettingsStore::Save` does it before each write.
 - [x] 1.4 P10/P11 routing doesn't persist (decided 2026-11-08). Volume, scale and root do.
@@ -91,26 +92,29 @@ Scale and root come from the panel gestures or MIDI (CC 20, CC 21, Program Chang
 
 ## Phase 2: MIDI link (read and write)
 
-The firmware side of the web manual link. TouchVink's `midi/telemetry.*` is the template: full-state frames, rate-limited, with a heartbeat and a REQUEST from the page.
+A connected device plays notes and sets knobs. The page sets root and scale, and reads root, scale, knobs, pads and switches. All of it runs at once on the one USB port.
 
-Proposed protocol, channel 16 as the control channel (it already sets the root by Note On):
-
-| | In (page → device) | Out (device → page) |
+| | In | Out (USB only unless noted) |
 |---|---|---|
-| CC 20 ch 16 | Root 0–11 (as today, any channel) | Root in effect, on change and after REQUEST |
-| CC 21 ch 16 | Scale 0–7 (as today, any channel) | Scale in effect, on change and after REQUEST |
-| CC 24 / 25 ch 16 | P10 / P11 routing on (≥ 64) or off | Routing in effect |
-| Shared live frame | | `F0 7D 53 54 01 <SW1> <SW2> <pads lo7> <pads hi5> F7`, the "live labels" frame on the labels roadmap |
-| TouchSpore frame | REQUEST `F0 7D 53 50 01 7E F7` | STATE `F0 7D 53 50 01 01 …` ("SP"): S30–S37, root, scale, routing, intensity, aura, chord root, AFE profile, CPU avg/max, saved flag |
+| Note On | Ch 1–15: plays that note on a plink. Ch 16: root | Generated notes: plinks ch 1, pads ch 2 (USB and TRS) |
+| CC 20 | Root 0–11, any channel | Ch 16: root in effect |
+| CC 21 | Scale 0–7, any channel | Ch 16: scale in effect |
+| CC 22–29 | S30–S37, any channel, until the knob is moved | |
+| Shared live frame | | `F0 7D 53 54 01 <SW1> <SW2> <pads lo7> <pads hi5> F7`, the "live labels" frame on the labels roadmap. Switches: 0 up, 1 centre, 2 down |
+| TouchSpore frame | REQUEST `F0 7D 53 50 01 7E F7` | STATE `F0 7D 53 50 01 01 <S30–S37> <root> <scale> <routing> F7` ("SP"). Knobs 0–127, routing bit 0 = pads, bit 1 = plinks |
 
-The CC echo lets the library read and write settings with no TouchSpore-specific code. The SysEx frames are for the mirror (pads, switches, knobs) and for readouts.
+The CC echo goes out on every change, from any source, and lets the library read and write settings with no TouchSpore-specific code. The frames are for the mirror. They run for 10 s after each REQUEST (the page re-sends it every 3 s), at most every 33 ms per frame type. A REQUEST and the 500 ms heartbeat re-send the CCs and both frames. Knob values in STATE are the values in effect, so a knob held by MIDI reports the MIDI value. Pads report firm touches, independent of S37.
 
-- [ ] 2.1 Write the shared live frame spec with the labels repo (its roadmap lists it under "The shared standard", unwritten). TouchSpore becomes its first sender after TouchPlaited, or the first if it ships first.
-- [ ] 2.2 Telemetry module: STATE on change at most every 33 ms, heartbeat every 500 ms, only for 10 s after the last REQUEST (the page re-sends REQUEST every 3 s).
-- [ ] 2.3 CC echo on ch 16 for root, scale and routing, whatever changed them (MIDI, panel gesture, boot load).
-- [ ] 2.4 CC 24/25 handlers for routing.
-- [ ] 2.5 Pads and knob moves as MIDI out, as TouchVink does (ch 10 notes 36–47, CC 22–29 for S30–S37)? Decide: TouchSpore already sends plinks on ch 1 and pads on ch 2.
-- [ ] 2.6 README MIDI section: the full map, in and out.
+The firmware makes one telemetry send per pass and skips passes that sent notes, because the USB endpoint holds one transfer at a time and `SendMessage` can't report a drop.
+
+- [ ] 2.1 Write the shared live frame spec with the labels repo (its roadmap lists it under "The shared standard", unwritten). The firmware sends the format in the table.
+- [x] 2.2 Telemetry in `SporeUI::_SendLink`.
+- [x] 2.3 CC echo on ch 16 for root and scale, whatever changed them (MIDI or panel gesture). Not at boot: no port is open yet, and the page asks with REQUEST.
+- [x] 2.4 Routing over MIDI dropped (decided 2026-11-08): routing is a live panel toggle and isn't saved. STATE still reports it.
+- [x] 2.5 Pads and knobs reach the page by SysEx only (decided 2026-11-08). MIDI out stays generated notes.
+- [x] 2.6 README MIDI section: the full map, in and out.
+- [x] 2.7 MIDI in: notes on ch 1–15 play plinks at their own pitch, and are not sent back out. CC 22–29 set S30–S37 until the knob moves past 2 %. CC 123 fixed (libDaisy delivers CC 120–127 as `ChannelMode`).
+- [x] 2.8 Hardware check (2026-11-08): MIDI in and out work on the device, values come through, and changes survive a reboot.
 
 ## Phase 3: OLED (optional hardware)
 
@@ -144,7 +148,7 @@ The route from [guide.html](https://jonwaterschoot.github.io/simple-touch-labels
 - [x] 4.2 `make release VERSION=x.y.z` → `build/touchspore-vX.Y.Z.bin` (lowercase, versioned, as the directory asks). Release steps in the README, changes in [CHANGELOG.md](../CHANGELOG.md).
 - [ ] 4.3 First GitHub release (0.1.0).
 - [ ] 4.4 Directory entry from the designer (Firmware tab › Directory entry…), pull request to the community directory.
-- [ ] 4.5 Labels in the designer: every control, P10/P11 as modifiers, MIDI column (CC 20, 21, 24, 25, 123, Program Change), notes. Modes for SW2 if the labels differ per position. Repository kit → `simple-touch-labels.json` at the root, control map in `docs/`.
+- [ ] 4.5 Labels in the designer: every control, P10/P11 as modifiers, MIDI column (CC 20, 21, 22–29, 123, Program Change, notes), notes. Modes for SW2 if the labels differ per position. Repository kit → `simple-touch-labels.json` at the root, control map in `docs/`.
 - [ ] 4.6 `Setup()` / `Loop()` split with `ST_WEB_FIRMWARE(Setup, Loop)`. Keep storage and the SPI stub out of the browser build. Hardware check after.
 - [ ] 4.7 `node ../simple-touch-web/scripts/build.mjs ../TouchSpore`, then the smoke test. Check the SDRAM delay lines and the `CpuLoadMeter` watchdog on the board.
 - [ ] 4.8 `.github/workflows/browser-build.yml` (simple-touch-web `@v1`).
@@ -167,9 +171,7 @@ Proposed `device` block in `simple-touch-labels.json`:
       "options": ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"] },
     { "id": "scale", "label": "Scale", "cc": 21, "channel": 16,
       "options": ["Natural minor", "Dorian", "Minor pentatonic", "Phrygian",
-                  "Major", "Lydian", "Major pentatonic", "Harmonic minor"] },
-    { "id": "to_pads",   "label": "Field → pads",   "cc": 24, "channel": 16, "type": "toggle" },
-    { "id": "to_plinks", "label": "Field → plinks", "cc": 25, "channel": 16, "type": "toggle" }
+                  "Major", "Lydian", "Major pentatonic", "Harmonic minor"] }
   ]
 }
 ```
@@ -193,5 +195,4 @@ simple-touch-web:
 
 - Does the OLED add flickers at the top of S37 with clips attached? Not with held wires (3.6).
 - Is one font enough for the screens, or does the value row need Font_11x18 (+3.4 KB)?
-- Pads and knobs as MIDI out, or keep MIDI out to the generated notes? (2.5)
 - Who keeps the `device` and live frame spec: this repo, simple-touch-labels or simple-touch-web? The labels roadmap is still waiting on Synthux about the shared label format.

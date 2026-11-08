@@ -40,8 +40,13 @@ static constexpr uint32_t kDelayMaxSamples = 48000 * 2;
 static constexpr uint8_t kCcRoot         = 20;    // value 0..11 → C..B (higher values wrap mod 12)
 static constexpr uint8_t kCcScale        = 21;    // value → scale index (wraps)
 static constexpr uint8_t kRootNoteChannel = 15;   // 0-based: Note On on MIDI channel 16 sets the root
+static constexpr uint8_t kCcFirstKnob    = 22;    // CC 22..29 → S30..S37, until the knob is moved
 // Program Change (any channel) → scale index
+// Note On on any other channel → plays that note on a plink
 // CC 123 → all notes off
+
+// Output (USB only): CC 20 / CC 21 echo of the root and scale in effect
+static constexpr uint8_t kLinkChannel    = 15;    // 0-based: MIDI channel 16
 
 // Output (generated notes, both ports)
 static constexpr uint8_t kPlinkMidiChannel = 0;   // MIDI ch 1
