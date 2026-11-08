@@ -128,6 +128,15 @@ make libs -j8 && make -j8 && make program-dfu
 ```
 Flash: ~119 KB of 128 KB.
 
+### Release
+
+1. In [CHANGELOG.md](CHANGELOG.md), rename `Unreleased` to the version and date, such as `0.1.0 (2026-11-20)`.
+2. `make release VERSION=0.1.0` writes `build/touchspore-v0.1.0.bin`.
+3. Commit, tag `v0.1.0`, and push the tag.
+4. Create a GitHub release from the tag, attach the `.bin`, and paste the version's changelog entry as the notes.
+
+Plans and progress: [docs/ROADMAP.md](docs/ROADMAP.md).
+
 Host simulation (no hardware): see the header of `tools/sim.cpp`.
 
 ## Open questions for the hardware

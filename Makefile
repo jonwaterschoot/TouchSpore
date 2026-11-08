@@ -32,3 +32,11 @@ libs:
 clean-libs:
 	cd $(LIBDAISY_DIR) && "$(MAKE)" clean
 	cd $(DAISYSP_DIR) && "$(MAKE)" clean
+
+# `make release VERSION=0.1.0` -> build/touchspore-v0.1.0.bin: the lowercase,
+# versioned name the Synthux community directory asks for on release assets.
+release: all
+ifndef VERSION
+	$(error usage: make release VERSION=x.y.z)
+endif
+	cp $(BUILD_DIR)/$(TARGET).bin $(BUILD_DIR)/touchspore-v$(VERSION).bin

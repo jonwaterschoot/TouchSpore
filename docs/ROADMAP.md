@@ -123,13 +123,14 @@ The browser build needs no OLED code of its own: simple-touch-web emulates the S
 The route from [guide.html](https://jonwaterschoot.github.io/simple-touch-labels/guide.html). Do this before Phase 5: the browser build lets the library test the MIDI link without hardware.
 
 - [ ] 4.1 Make the repo public. Add a LICENSE (check TouchString's licence for the files credited from it). Note DaisySP-LGPL (`ReverbSc`) in the README as TouchVink does.
-- [ ] 4.2 `make release VERSION=x.y.z` → `build/touchspore-vX.Y.Z.bin` (lowercase, versioned, as the directory asks). First GitHub release.
-- [ ] 4.3 Directory entry from the designer (Firmware tab › Directory entry…), pull request to the community directory.
-- [ ] 4.4 Labels in the designer: every control, P10/P11 as modifiers, MIDI column (CC 20, 21, 24, 25, 123, Program Change), notes. Modes for SW2 if the labels differ per position. Repository kit → `simple-touch-labels.json` at the root, control map in `docs/`.
-- [ ] 4.5 `Setup()` / `Loop()` split with `ST_WEB_FIRMWARE(Setup, Loop)`. Keep storage and the SPI stub out of the browser build. Hardware check after.
-- [ ] 4.6 `node ../simple-touch-web/scripts/build.mjs ../TouchSpore`, then the smoke test. Check the SDRAM delay lines and the `CpuLoadMeter` watchdog on the board.
-- [ ] 4.7 `.github/workflows/browser-build.yml` (simple-touch-web `@v1`).
-- [ ] 4.8 Listen on the test bench, then approve the build (designer › Find builds › Use this build, `"oled": true` once Phase 3 ships).
+- [x] 4.2 `make release VERSION=x.y.z` → `build/touchspore-vX.Y.Z.bin` (lowercase, versioned, as the directory asks). Release steps in the README, changes in [CHANGELOG.md](../CHANGELOG.md).
+- [ ] 4.3 First GitHub release (0.1.0).
+- [ ] 4.4 Directory entry from the designer (Firmware tab › Directory entry…), pull request to the community directory.
+- [ ] 4.5 Labels in the designer: every control, P10/P11 as modifiers, MIDI column (CC 20, 21, 24, 25, 123, Program Change), notes. Modes for SW2 if the labels differ per position. Repository kit → `simple-touch-labels.json` at the root, control map in `docs/`.
+- [ ] 4.6 `Setup()` / `Loop()` split with `ST_WEB_FIRMWARE(Setup, Loop)`. Keep storage and the SPI stub out of the browser build. Hardware check after.
+- [ ] 4.7 `node ../simple-touch-web/scripts/build.mjs ../TouchSpore`, then the smoke test. Check the SDRAM delay lines and the `CpuLoadMeter` watchdog on the board.
+- [ ] 4.8 `.github/workflows/browser-build.yml` (simple-touch-web `@v1`).
+- [ ] 4.9 Listen on the test bench, then approve the build (designer › Find builds › Use this build, `"oled": true` once Phase 3 ships).
 
 Known gap in the browser: the board's MPR121 is noise-free, with a fixed baseline of 720 and the proximity electrode at baseline. Strikes work. Flickers, the aura and the top half of S37 do nothing, because they live on noise. See 5.6.
 
