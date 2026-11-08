@@ -123,7 +123,7 @@ The browser build needs no OLED code of its own: simple-touch-web emulates the S
 The route from [guide.html](https://jonwaterschoot.github.io/simple-touch-labels/guide.html). Do this before Phase 5: the browser build lets the library test the MIDI link without hardware.
 
 - [x] 4.1a MIT LICENSE, README License section with the DaisySP-LGPL note.
-- [ ] 4.1b TouchString has no license file. Ask Synthux (Vlad, Rosa, Vincent) to add one, or rewrite `touch/knobs.*`, `touch/switches.*`, `touch/syscalls.cpp`, `common/nocopy.h` and the MPR121 setup in `touch/field.cpp`, then drop the exclusion from the README.
+- [ ] 4.1b TouchString has no license file (nor do TouchBloop, TouchBass and TouchFX). Synthux uses MIT on AudreyTouch, Audrey II and Spotykach. Issue on TouchString asking for one. Once it is MIT, drop the TouchString exclusion from the README's License section.
 - [ ] 4.1c Make the repo public.
 - [x] 4.2 `make release VERSION=x.y.z` → `build/touchspore-vX.Y.Z.bin` (lowercase, versioned, as the directory asks). Release steps in the README, changes in [CHANGELOG.md](../CHANGELOG.md).
 - [ ] 4.3 First GitHub release (0.1.0).
