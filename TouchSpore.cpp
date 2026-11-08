@@ -3,6 +3,7 @@
 #include "engine/engine.h"
 #include "ui/spore_ui.h"
 #include "display/oled.h"
+#include "ui/spore_boot.h"
 
 const char* USBD_MANUFACTURER_STRING = "Synthux";
 const char* USBD_PRODUCT_STRING_HS   = "TouchSpore";
@@ -58,10 +59,7 @@ int main(void) {
     touch.Init(hw);
     // Screen on before the baseline learn, so the pads calibrate with the panel running
     // (its charge pump adds supply noise). No screen at 0x3C: nothing is sent, ever.
-    if (oled.Init(touch.field().Bus())) {
-        oled.Text((Oled::kWidth - 10 * Oled::kCharW) / 2, 12, "TOUCHSPORE");
-        oled.Flush();
-    }
+    if (oled.Init(touch.field().Bus())) BootAnimation(oled, System::GetTick());
     // Let Field learn baselines and noise floors (~0.5 s) before anything can trigger
     for (int i = 0; i < 140; i++) {
         touch.Process();

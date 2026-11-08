@@ -109,6 +109,19 @@ so long reverb tails and stacked plinks are turned down instead of clipping.
 Simulated storm of 80 flickers/s (`tools/sim.cpp`): Free plays 8 notes/s with leaps up to 18
 semitones; Melodic plays ~2 notes/s, max leap 5 semitones, across 2½ octaves.
 
+## OLED (optional)
+
+SSD1306 128×32 I2C screen on D11 (SCL) / D12 (SDA), address 0x3C, powered from 3V3. It shares the MPR121's bus. With no screen fitted the firmware sends nothing to it.
+
+| Row | Shows |
+|---|---|
+| 0 | Last moved control and its value, or the recalibrate bar |
+| 1 | Root and scale |
+| 2 | PL: a dot per scale note, lit when a plink plays it. Right: last plink note |
+| 3 | PD: the chord's notes, filled while the pads sound. Right: chord name |
+
+At boot, TOUCHSPORE gets overgrown by branching hyphae (about 1 s). The pads then learn their baselines with the screen running. Untested: whether the screen's charge pump adds flickers with S37 at the top. If it does, recalibrate with the screen fitted.
+
 ## MIDI (USB; TRS on USART1 with the TRS mod: RX D14, TX D13)
 
 TRS MIDI is off by default: it was causing errors, if you modded your Simple Touch with trs, build with `make UART_MIDI=1`. On a stock Simple Touch D14 floats, and the noise on it made libDaisy's UART error handling
@@ -129,7 +142,7 @@ git submodule add https://github.com/electro-smith/DaisySP.git lib/DaisySP
 git submodule update --init --recursive
 make libs -j8 && make -j8 && make program-dfu
 ```
-Flash: ~109 KB of 128 KB.
+Flash: ~122 KB of 128 KB.
 
 ### Release
 

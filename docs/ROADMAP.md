@@ -8,22 +8,25 @@ Related repos: [simple-touch-labels](https://github.com/jonwaterschoot/simple-to
 
 ### Flash (measured 2026-11-08)
 
-Built with the Daisy Toolchain against the pinned libDaisy. The OLED rows link TouchVink's `display/oled_screen.cpp` and its dirty-page driver unchanged, apart from the font swap in the 1-font row.
+Built with the Daisy Toolchain against the pinned libDaisy (text + data of the release build).
 
 | Build | Flash used | Free of 131,072 B |
 |---|---|---|
-| Today | 118,736 B | 12,336 B |
-| Phase 0 savings (SPI stub + `-Os` on control code) | 108,604 B | 22,468 B |
-| + settings storage (`PersistentStorage`) | +3,208 B | |
-| + OLED, Font_6x8 only | +5,096 B | |
-| + OLED, 3 fonts as TouchVink (6x8, 7x10, 11x18) | +10,472 B | |
-| + telemetry frame (stub) | +~200 B | |
-| Phase 0 + storage + OLED 1 font + telemetry stub | 117,084 B | 13,988 B |
-| Phase 0 + storage + OLED 3 fonts + telemetry stub | 122,460 B | 8,612 B |
+| Before Phase 0 | 118,736 B | 12,336 B |
+| Phase 0 (SPI stub + `-Os` on control code) | 108,596 B | 22,476 B |
+| + MPR121 repeated-start fix | 107,868 B | 23,204 B |
+| + OLED: DMA driver, Font_6x8, screen | 120,308 B | 10,764 B |
+| + hidden volume, compressor change | 120,972 B | 10,100 B |
+| + boot animation (today) | 121,516 B | 9,556 B |
 
-Not in those numbers yet: the OLED screens themselves (TouchVink's `oled_ui.cpp` + boot animation, estimated 4–7 KB) and the full SysEx parser and settings echo (estimated 1.5–2.5 KB). Expected end state with one font: 121–124 KB, so 4–7 KB free. With TouchVink's three fonts it would leave 0–4 KB, which is too tight.
+The OLED added 12,440 B, more than the 5,096 B estimated from TouchVink's blocking driver. About 7 KB of it is libDaisy's interrupt-driven I2C HAL, which any I2C DMA transfer links in full (slave modes included). Font_6x8 is 1.5 KB, our driver and screen about 2.5 KB.
 
-Without Phase 0 the OLED does not fit at all (133,328 B, 1.7 % over).
+Still to come: settings storage (+3,208 B measured), the SysEx telemetry and settings echo (estimated 1.7–2.7 KB). Expected end state: 126.4–127.4 KB, so 3.7–4.7 KB free.
+
+If it gets too tight:
+
+- **I2C DMA by register (~6 KB back, estimated).** Drive DMA1 and I2C1 for the OLED directly and poll for completion in `Oled::WaitIdle()`. The HAL's I2C interrupt code then drops out of the link. The MPR121 keeps the blocking HAL calls.
+- **`BOOT_SRAM`.** See below.
 
 Where the savings come from:
 
@@ -50,7 +53,7 @@ Everything planned here runs in the main loop, and the audio callback gets no ne
 
 Main-loop timing does change, and several timings count loop passes (tap < 150 passes, recalibrate 625 passes, ~250 Hz):
 
-- **OLED.** One 128-byte page takes ~3.3 ms of bus time at 400 kHz, and a blocking transfer stretches with the audio load (the audio interrupt preempts it). With passes up to 2.7 ms, a full page per pass overruns the 4 ms period. Plan: send the OLED by I2C DMA right after the touch read, so the transfer runs while the rest of the pass and the wait run, in 64-column half pages (~1.7 ms). The touch read waits for a transfer still in flight. The dirty-page driver only sends what changed. 20 frames/s max.
+- **OLED.** One 128-byte page takes ~3.3 ms of bus time at 400 kHz, and a blocking transfer stretches with the audio load (the audio interrupt preempts it). With passes up to 2.7 ms, a full page per pass overruns the 4 ms period. So `Oled::Service()` starts one changed 64-column half page (~1.7 ms) by I2C DMA right after the touch read, and the transfer runs during the rest of the pass and the wait. The next touch read waits for it (`Oled::WaitIdle()`).
 - **Settings save.** `PersistentStorage::Save()` erases a 4 KB QSPI sector (45 ms typical, 300 ms max) and blocks the main loop for that time. Audio keeps running (code runs from internal flash), but pads and knobs pause. Save 5 s after the last change, never on every change.
 - **USB SysEx.** With no app reading the port, every failed TX burns ~100 µs (see `tx_retry_count` in `ui/spore_ui.cpp`). Stream telemetry only after the page has asked for it.
 
@@ -111,10 +114,10 @@ The CC echo lets the library read and write settings with no TouchSpore-specific
 
 128×32 SSD1306 on I2C1, D11 (SCL) / D12 (SDA), address 0x3C, as on TouchVink and TouchPlaited. Without a screen fitted nothing changes.
 
-- [ ] 3.1 Port TouchVink's `display/oled_screen.*` and `oled_dirty_driver.h`. Start with Font_6x8 only. Add a larger font only if the budget allows after 3.3.
-- [ ] 3.2 Probe 0x3C at boot. Init at 400 kHz. One page per pass, 20 frames/s max.
-- [ ] 3.3a One screen, Font_6x8 only (decided 2026-11-08). Row 0: last touched control and its value. Rows 2–3: one column per scale note (5 or 7), PL row flashes each plink note, PD row shows the chord tones. Right of the grid: root and scale, current chord. Note names use `#` (`C#`, `C#4`): Font_6x8 is ASCII only.
-- [ ] 3.3b Boot: `TOUCHSPORE` overgrown by branching hyphae (~1 s), held on screen while Field learns baselines, so the pads calibrate with the screen running.
+- [x] 3.1 Own driver instead of TouchVink's (`display/oled.*`): Font_6x8 only, dirty half pages by I2C DMA (see Main-loop timing).
+- [x] 3.2 Probe 0x3C at boot, 400 kHz from `Field`. One half page per pass.
+- [x] 3.3a One screen, Font_6x8 only (decided 2026-11-08). Row 0: last touched control and its value. Row 1: root and scale. Rows 2–3: one column per scale note (5 or 7), PL row flashes each plink note, PD row shows the chord tones. Right of the grid: last plink note, current chord. Note names use `#` (`C#`, `C#4`): Font_6x8 is ASCII only.
+- [x] 3.3b Boot: `TOUCHSPORE` overgrown by branching hyphae (~1 s), held on screen while Field learns baselines, so the pads calibrate with the screen running.
 - [ ] 3.3 Screens, all from the same state struct as the telemetry (TouchVink does the same, so the screen and the page can't disagree):
   - boot: name and version
   - touched control: name + value in units (reverb %, delay %, highest note D5/D6/D7, sensitivity %)
@@ -122,10 +125,10 @@ The CC echo lets the library read and write settings with no TouchSpore-specific
   - P10+P11 hold: progress bar to recalibrate, then "SMOOTH" or "RAW" (the LED blink codes stay)
   - P10/P11 tap: routing on/off
   - idle: scale, chord, an intensity bar
-- [ ] 3.4 Measure flash after each screen. Stop adding when free flash drops below 3 KB.
-- [ ] 3.5 The watchdog's freeze code stays LED-only: it runs in the audio callback and must not touch I2C.
+- [x] 3.4 Measure flash after each screen. Stop adding when free flash drops below 3 KB.
+- [x] 3.5 The watchdog's freeze code stays LED-only: it runs in the audio callback and must not touch I2C.
 - [ ] 3.6 Touch test on hardware, S37 at the top with clips: flicker rate with no screen, with the screen fitted and static, and while it redraws. If the screen adds flickers: lower the contrast, turn the screen off after 30 s idle, recalibrate with the screen fitted.
-- [ ] 3.7 README: wiring, what each screen shows.
+- [x] 3.7 README: wiring, what each screen shows.
 
 The browser build needs no OLED code of its own: simple-touch-web emulates the SSD1306 at register level and draws what the firmware sends. TouchVink's own web manual re-draws the screens in TypeScript (`oled-mini.ts`); that is not needed here.
 
