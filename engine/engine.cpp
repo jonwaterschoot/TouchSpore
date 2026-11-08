@@ -92,8 +92,10 @@ void Engine::Process(const float* const* in, float** out, size_t size) {
         l *= 2.4f;
         r *= 2.4f;
         _comp.Process(l, r);
-        out[0][i] = daisysp::SoftClip(l);
-        out[1][i] = daisysp::SoftClip(r);
+        // Volume after the clip: it only attenuates, the clip's character stays the same
+        _volume_s += (_volume - _volume_s) * 0.001f;
+        out[0][i] = daisysp::SoftClip(l) * _volume_s;
+        out[1][i] = daisysp::SoftClip(r) * _volume_s;
     }
 }
 

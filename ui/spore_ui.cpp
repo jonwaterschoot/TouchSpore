@@ -16,6 +16,7 @@ constexpr uint8_t  kStrikeFlash   = 12;    // ~50 ms LED flash per detected stri
 constexpr uint8_t  kFlickerFlash  = 2;     // ~8 ms per flicker
 constexpr int      kMidiPerLoop   = 4;     // UART TX blocks ~1 ms per message: cap the main-loop stall
 constexpr float    kKnobStep      = 0.01f; // a knob counts as moved (and shows on the OLED) past 1 %
+constexpr uint16_t kVolumeHoldTicks = 500; // ~2 s with S36 still: back from volume to mix
 
 const char* const kKnobLabels[8] = {
     "REVERB", "DELAY", "CHORUS", "PAD BLEND", "TONE", "ATTACK/DECAY", "MIX", "SENSE",
@@ -88,7 +89,6 @@ void SporeUI::_ProcessControls() {
     _engine.SetPadBlend(v[3]);
     _engine.SetPlinkTone(v[4]);
     _engine.SetPlinkShape(v[5]);
-    _engine.SetMix(v[6]);
     _touch.field().SetSensitivity(v[7]);
 
     auto a = _touch.switches().A();
@@ -102,13 +102,69 @@ void SporeUI::_ProcessControls() {
         _settle--;
         for (int i = 0; i < 8; i++) _shown[i] = v[i];
         _sw_a = a; _sw_b = b;
+        _mix = v[6];
+        _engine.SetMix(_mix);
+        _engine.SetVolume(_volume * _volume);
         return;
     }
     for (int i = 0; i < 8; i++) {
+        if (i == 6) continue;   // S36: _ProcessFader
         if (fabsf(v[i] - _shown[i]) > kKnobStep) { _shown[i] = v[i]; _ShowKnob(i, v[i]); }
     }
+    _ProcessFader(v[6]);
     if (a != _sw_a) { _sw_a = a; _ShowSwitch(true, a); }
     if (b != _sw_b) { _sw_b = b; _ShowSwitch(false, b); }
+}
+
+void SporeUI::_ProcessFader(float s36) {
+    const bool moved = fabsf(s36 - _shown[6]) > kKnobStep;
+    char val[22];
+
+    // Enter: S36 moves while P10 + P11 are held (the recalibrate bar is filling). The
+    // hold is cancelled in _ProcessModPads.
+    auto& f = _touch.field();
+    if (!_vol_mode && moved && !_recal_armed && _recal_lock == 0
+        && f.IsFirmTouched(kPadSynthPad) && f.IsFirmTouched(kPlinkPad)) {
+        _vol_mode = true;
+    }
+
+    if (_vol_mode) {
+        if (moved) {
+            _shown[6] = s36;
+            _volume = s36;
+            _vol_idle = 0;
+            _engine.SetVolume(_volume * _volume);
+            PutStr(PutInt(val, static_cast<int>(_volume * 100.f + 0.5f)), " %");
+            _screen.ShowControl("SET VOLUME", val);
+        } else if (++_vol_idle >= kVolumeHoldTicks) {
+            _vol_mode = false;
+            _mix_pickup = fabsf(s36 - _mix) > kKnobStep;
+            _pickup_above = s36 > _mix;
+            PutStr(PutInt(val, static_cast<int>(_volume * 100.f + 0.5f)), " %");
+            _screen.ShowControl("VOLUME", val);
+        }
+        return;
+    }
+
+    if (_mix_pickup) {
+        if ((s36 > _mix) != _pickup_above || fabsf(s36 - _mix) <= kKnobStep) {
+            _mix_pickup = false;   // crossed the old mix position: S36 is the mix again
+        } else {
+            if (moved) {
+                // Fader position → mix in effect, as plinks %
+                _shown[6] = s36;
+                char* p = PutInt(val, static_cast<int>(s36 * 100.f + 0.5f));
+                p = PutStr(p, " -> ");
+                PutInt(p, static_cast<int>(_mix * 100.f + 0.5f));
+                _screen.ShowControl("MIX PICKUP", val);
+            }
+            return;
+        }
+    }
+
+    _mix = s36;
+    _engine.SetMix(_mix);
+    if (moved) { _shown[6] = s36; _ShowKnob(6, s36); }
 }
 
 void SporeUI::_ShowKnob(int i, float v) {
@@ -155,6 +211,14 @@ void SporeUI::_ProcessModPads() {
     // the MPR121's auto-config sets each pad's charge current for a pad with a finger on
     // it, and the baselines learn the fingers. Recalibrating while held left P10/P11 not
     // responding afterwards (2026-11-08, most likely this).
+    // Volume mode (S36 moved during the hold): P10/P11 do nothing until it ends, and a
+    // pad still held then can't count as a tap
+    if (_vol_mode) {
+        _hold_10 = _hold_11 = 0;
+        _both_used = t10 || t11;
+        return;
+    }
+
     if (_recal_armed) {
         if (t10 || t11) { _recal_wait = kRecalWaitTicks; return; }
         if (--_recal_wait > 0) return;

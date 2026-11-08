@@ -28,6 +28,10 @@ static constexpr uint8_t kDefaultScale   = 0;     // natural minor
 static constexpr int     kPlinkBaseMidi  = 12 * 5; // degree 0 of the plinks sits in octave 4 (D4 = 62)
 static constexpr int     kPadBaseMidi    = 12 * 3; // pad chords centre around D2..D3
 
+// Hidden volume (P10 + P11 + S36), after the soft clip. Fader position 0–1, gain = position².
+// Resets to this on every boot until settings storage exists (roadmap Phase 1).
+static constexpr float   kDefaultVolume  = 0.6f;  // gain 0.36, −9 dB
+
 // Delay buffer (lives in SDRAM, allocated in TouchSpore.cpp)
 static constexpr uint32_t kDelayMaxSamples = 48000 * 2;
 

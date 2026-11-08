@@ -31,6 +31,9 @@ Built on the TouchString project structure and its introduction of velocity emul
 | P10 tap | Toggle field → slow pads (a strike makes that pad the chord root, at once) |
 | P11 tap | Toggle field → plinks (on by default) |
 | P10 + P11 hold 2.5 s, let go | Recalibrate. Do this after attaching/removing clips |
+| P10 + P11 hold, move S36 | Volume (default 60 %). See below |
+
+**Volume** (P10 + P11 + S36): hold P10 and P11, then move S36 before the recalibrate bar fills. You can let go of the pads. S36 sets the volume until it rests for 2 seconds, then controls the mix again once it passes the old mix position. The volume resets to 60 % on every boot.
 
 **Per-note variation** (SW2 up): every plink samples three drunk walks (random walks) plus its own
 small jitter. These offset octave (−1/0/+1), tone (S34 ±0.5) and attack/decay (S35 ±0.65) around the

@@ -38,12 +38,14 @@ private:
 // Stereo-linked bus compressor in front of the final soft clip, so long reverb tails and
 // stacked plinks get turned down instead of driven into the clipper. Peak detector;
 // the gain is computed at control rate (one powf per 16 samples) and smoothed per sample.
+// Attack 0.5 ms and gain smoothing 1 ms: with 2 ms and 3 ms, plink attacks (FM glass
+// most of all) reached the soft clip before the gain came down and distorted the highs.
 class BusCompressor {
 public:
     void Init(float sr) {
-        _att    = 1.f - expf(-1.f / (0.002f * sr));    // 2 ms
+        _att    = 1.f - expf(-1.f / (0.0005f * sr));   // 0.5 ms
         _rel    = 1.f - expf(-1.f / (0.25f * sr));     // 250 ms
-        _smooth = 1.f - expf(-1.f / (0.003f * sr));
+        _smooth = 1.f - expf(-1.f / (0.001f * sr));
     }
 
     void Process(float& l, float& r) {
@@ -62,7 +64,7 @@ public:
 private:
     // Levels are at the soft clip's input, which is close to linear below ~0.5
     static constexpr float kThreshold = 0.5f;
-    static constexpr float kMakeup    = 1.3f;
+    static constexpr float kMakeup    = 1.0f;   // was 1.3: that pushed compressed peaks into the curve of the clip
 
     float _att = 0.f, _rel = 0.f, _smooth = 0.f;
     float _env = 0.f, _gain = 1.f, _target = 1.f;

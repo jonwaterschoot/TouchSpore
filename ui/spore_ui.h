@@ -21,6 +21,7 @@ namespace synthux {
 //   P10 tap   toggle: field → slow pads (touch picks the next chord root)
 //   P11 tap   toggle: field → plinks
 //   P10 + P11 hold ~2.5 s, then let go: recalibrate (do this after attaching crocodile clips)
+//   P10 + P11 held + S36 moved: S36 sets the volume until it rests 2 s (_ProcessFader)
 class SporeUI : public FieldListener {
 public:
     SporeUI(Touch& touch, spore::Engine& engine, Oled& oled)
@@ -71,6 +72,17 @@ private:
     float    _shown[8] = {};
     uint8_t  _settle = 50;
     int      _sw_a = -1, _sw_b = -1;
+
+    // Hidden volume: S36 moved while P10 + P11 are held. S36 then sets the volume until
+    // it has been still for kVolumeHoldTicks. The mix stays put meanwhile, and S36 takes
+    // it back only once the fader crosses the old mix position (pickup, no jump).
+    void     _ProcessFader(float s36);
+    float    _volume = spore::kDefaultVolume;
+    float    _mix = 0.5f;
+    bool     _vol_mode = false;
+    uint16_t _vol_idle = 0;
+    bool     _mix_pickup = false;
+    bool     _pickup_above = false;   // fader was above the mix when the pickup started
 
 #ifdef USB_MIDI
     daisy::MidiUsbHandler  _midi_usb;

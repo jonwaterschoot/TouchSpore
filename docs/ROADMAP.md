@@ -76,7 +76,7 @@ Electrically it is untested. The SSD1306 runs a charge pump, and its supply curr
 
 Today root and scale come only from MIDI (CC 20, CC 21, Program Change, Note On ch 16) and reset to D natural minor on every boot (`engine/scale.h` defaults).
 
-- [ ] 1.1 `Settings { version, root, scale, to_pads, to_plinks }` in `PersistentStorage` at a fixed QSPI offset well above 0 (the Daisy bootloader keeps apps at 0x90040000). Load before `engine.Init()`.
+- [ ] 1.1 `Settings { version, root, scale, to_pads, to_plinks, volume }` in `PersistentStorage` at a fixed QSPI offset well above 0 (the Daisy bootloader keeps apps at 0x90040000). Load before `engine.Init()`.
 - [ ] 1.2 `Engine::Root()` / `Engine::Scale()` getters (the values in effect, after `_pending_*` is applied in the audio callback).
 - [ ] 1.3 Save 5 s after the last change, from the main loop. LED: 1 long blink when saved.
 - [ ] 1.4 Decide whether P10/P11 routing persists too, or only root and scale.

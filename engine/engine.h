@@ -48,6 +48,7 @@ public:
     void SetCeiling(uint8_t oct) { _ceiling_oct = oct; } // highest plink: 1..3 octaves above degree 0
     void SetPlinkShape(float k)  { _plink_shape = k; }
     void SetMix(float k)         { _mix = k; }          // 0 = pads only, 0.5 = equal, 1 = plinks only
+    void SetVolume(float gain)   { _volume = gain; }    // linear, after the soft clip
     void SetIntensity(float k)   { _intensity = k; }
     void SetAutoMode(Generator::Mode m)    { _gen_mode = m; }
     void SetAutoMod(bool on)     { _auto_mod = on; }   // per-note random octave, tone and shape
@@ -109,6 +110,8 @@ private:
     // Auto modulation (right switch up): drunk walks, sampled and held by each plink
     float _walk_oct = 0.f, _walk_tone = 0.f, _walk_shape = 0.f;
     volatile float _mix = 0.5f, _intensity = 0.f;
+    volatile float _volume = kDefaultVolume * kDefaultVolume;
+    float          _volume_s = kDefaultVolume * kDefaultVolume;   // smoothed per sample (~20 ms)
     volatile Generator::Mode    _gen_mode = Generator::Mode::On;
     volatile MelodyFilter::Mode _filter_mode = MelodyFilter::Mode::Melodic;
     volatile int  _pending_root = -1, _pending_scale = -1;
