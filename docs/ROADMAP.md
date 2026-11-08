@@ -153,7 +153,7 @@ The route from [guide.html](https://jonwaterschoot.github.io/simple-touch-labels
 - [x] 4.6 `Setup()` / `Loop()` split with `ST_WEB_FIRMWARE(Setup, Loop)`. Keep storage, the SPI stub and `touch/syscalls.cpp` out of the browser build. The browser `Loop()` ends in `System::Delay(4)`: its clock advances only between passes, so the 4 ms spin would never end. ARM and wasm builds compile. Hardware check passed (2026-11-08). The browser build arms recalibrate after 10 s instead of 2.5 s, because reaching a third control with a mouse takes longer and an armed recalibration refuses the gestures.
 - [x] 4.7 `node ../simple-touch-web/scripts/build.mjs ../TouchSpore`, then the smoke test (2026-11-08: 105 KB, boots, all 12 pads, OLED, MIDI out). Check the SDRAM delay lines and the `CpuLoadMeter` watchdog on the board.
 - [x] 4.8 `.github/workflows/browser-build.yml` (simple-touch-web `@v1`). First run green (2026-11-08). A Windows build's hash differs from CI's: only the compiler version string in the `producers` section changes.
-- [x] 4.9 Listen on the test bench, then approve the build (designer › Find builds › Use this build, `"oled": true` once Phase 3 ships). Approved 2026-11-08: `TouchSpore-5f3bb1a151d6.wasm`, gestures tested on the bench.
+- [x] 4.9 Listen on the test bench, then approve the build (designer › Find builds › Use this build, `"oled": true` once Phase 3 ships). Approved 2026-11-08: `TouchSpore-dc0f4370cbd5.wasm`, with MIDI in. Gestures and the settings panel tested on the bench.
 
 Known gap in the browser: the board's MPR121 is noise-free, with a fixed baseline of 720 and the proximity electrode at baseline. Strikes work. Flickers, the aura and the top half of S37 do nothing, because they live on noise. See 5.6.
 
@@ -182,8 +182,8 @@ A setting writes by sending its CC and shows the value the device echoes back, s
 simple-touch-labels:
 
 - [ ] 5.1 Spec: `device` (port name, live frame version, settings with `cc`, `channel`, `options` / `range` / `type`) in the label format spec, with a JSON Schema entry.
-- [x] 5.2 Player and test bench: a source switch, Browser build ↔ Device. Device runs no firmware in the page, picks the Web MIDI in/out ports whose name contains `device.port`, sends REQUEST, and the panel reads and writes only the board. In Browser build mode one device cannot be both MIDI in and MIDI out.
-- [ ] 5.2b Player: the drawing follows the live frame in Device mode (pads lit, levers, mode labels follow SW1/SW2).
+- [x] 5.2 Player and test bench: a mode switch, Play in browser ↔ Connect to Simple Touch. Connected, no firmware runs in the page, it picks the Web MIDI in/out ports whose name contains `device.port`, sends REQUEST, and the panel reads and writes only the board. In Play in browser one device cannot be both MIDI in and MIDI out.
+- [ ] 5.2b Player: the drawing follows the live frame in Connect to Simple Touch (pads lit, levers, mode labels follow SW1/SW2).
 - [x] 5.3 Player and test bench: a panel built from `device` by simple-touch-web's `web/device-panel.js`: `buttons` send on click, `select` has a Send button, `presets` send several messages. Nothing is highlighted until the first report. Ranges and toggles later.
 - [ ] 5.4 Designer: edit `device.settings` in the Firmware tab, and fill it from the MIDI column where possible.
 - [ ] 5.5 Later: firmware-specific readouts (intensity, chord, CPU) declared by byte offset in the firmware's own SysEx frame.
