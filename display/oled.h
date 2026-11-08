@@ -19,9 +19,19 @@ public:
     static constexpr int kWidth = 128, kHeight = 32;
     static constexpr int kCharW = 6, kCharH = 8;   // Font_6x8: 21 characters × 4 rows
 
-    // Probes 0x3C. false: no screen fitted, and every call below does nothing.
+    // Probes 0x3C. false: no screen fitted, and nothing goes to the bus.
     bool Init(daisy::I2CHandle& i2c);
     bool Present() const { return _present; }
+
+    // The web manual's copy of the screen. While on, the frame buffer is tracked with or
+    // without a screen fitted, and every half page that changed queues one SysEx frame:
+    //   F0 7D 53 4F 01 <page> <column> <data, 7-bit packed> F7
+    // Packing: groups of up to 7 bytes, each after a byte holding their top bits (bit n = byte n).
+    static constexpr int kMirrorFrameBytes = 82;
+    void SetMirror(bool on) { _mirror = on; }
+    void MirrorAll() { _web = 0xFF; }
+    bool Drawing() const { return _present || _mirror; }
+    int  MirrorFrame(uint8_t* frame);   // 0: nothing queued
 
     void Clear();
     void Pixel(int x, int y, bool on);
@@ -46,6 +56,9 @@ private:
     volatile bool _busy = false;
     uint8_t       _stale = 0;      // bit per half page: resend whatever _sent says (Init() sets all)
     uint8_t       _next = 0;       // round robin, so one busy half page can't starve the rest
+    bool          _mirror = false;
+    uint8_t       _web = 0;        // bit per half page: queued for the web manual
+    uint8_t       _web_next = 0;
     uint8_t       _fb[kPages * kWidth] = {};     // page layout: a byte is 8 pixels down, bit 0 on top
     uint8_t       _sent[kPages * kWidth] = {};   // what the panel shows
 };

@@ -19,6 +19,7 @@ constexpr uint16_t kSettlePolls = 125;     // ~0.5 s noise/baseline learning aft
 constexpr uint16_t kHealthPolls = 250;     // ~1 s between chip checks
 constexpr uint16_t kFailPolls   = 25;      // ~0.1 s of failed reads → reset the I2C peripheral
 constexpr uint8_t  kEcrRun      = 0xBC;    // CL = 10, ELEPROX_EN = 11 (ELE0..11 as electrode 13), 12 electrodes
+constexpr uint16_t kPressPolls  = 500;     // ~2 s: presses from the web manual end without a refresh
 
 inline float lerp(float a, float b, float t) { return a + (b - a) * t; }
 inline float lerp_exp(float a, float b, float t) { return a * powf(b / a, t); }
@@ -164,7 +165,13 @@ bool Field::_CheckChip() {
     return true;
 }
 
+void Field::SetPress(uint8_t pad, float force) {
+    if (pad < 12) _press[pad] = force;
+    _press_polls = kPressPolls;
+}
+
 void Field::Process() {
+    if (_press_polls > 0 && --_press_polls == 0) for (auto& p : _press) p = 0.f;
     if (!_CheckChip()) return;
 
     // Touch status (2 bytes), out-of-range status (2), filtered data ELE0..ELE12 (26)
@@ -189,7 +196,7 @@ void Field::Process() {
 
         const float d = fabsf(f - e.prev);
         e.prev = f;
-        const float delta = e.base - f;    // grows when capacitance rises (finger, hand, plant, wire)
+        float delta = e.base - f;          // grows when capacitance rises (finger, hand, plant, wire)
 
         // Baseline + noise floor ..........................................
         if (settling) {
@@ -206,6 +213,12 @@ void Field::Process() {
             e.base  += (f - e.base) * 0.0005f;
         }
         const float noise = fmaxf(e.noise, 0.25f);
+
+        // A press from the web manual clears every threshold, whatever the fader says
+        if (i < 12 && _press[i] > 0.f) {
+            const float need = fmaxf(fmaxf(_thr, noise * _noise_mul), fmaxf(kFirmOn, noise * kFirmNoise));
+            delta = fmaxf(delta, need * 1.5f + _press[i] * _range);
+        }
 
         // Firm touch (fixed, for control pads) ............................
         const float firm_on = fmaxf(kFirmOn, noise * kFirmNoise);

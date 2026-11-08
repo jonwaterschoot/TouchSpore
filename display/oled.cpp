@@ -92,6 +92,7 @@ bool Oled::_Send(int c, bool dma) {
     std::memcpy(dma_buf + 1, src, kChunk);
     std::memcpy(&_sent[c * kChunk], src, kChunk);
     _stale &= static_cast<uint8_t>(~(1u << c));
+    _web |= static_cast<uint8_t>(1u << c);
 
     if (!dma) {
         if (_i2c->TransmitBlocking(kAddr, dma_buf, sizeof(dma_buf), 10) == I2CHandle::Result::OK) return true;
@@ -106,15 +107,44 @@ bool Oled::_Send(int c, bool dma) {
 }
 
 void Oled::Service() {
-    if (!_present || _busy) return;
+    if (!Drawing() || _busy) return;
     for (int i = 0; i < kChunks; i++) {
         const int c = (_next + i) % kChunks;
         if ((_stale & (1u << c)) || std::memcmp(&_fb[c * kChunk], &_sent[c * kChunk], kChunk) != 0) {
-            _Send(c, true);
+            if (_present) {
+                _Send(c, true);
+            } else {
+                std::memcpy(&_sent[c * kChunk], &_fb[c * kChunk], kChunk);
+                _web |= static_cast<uint8_t>(1u << c);
+            }
             _next = static_cast<uint8_t>((c + 1) % kChunks);
             return;
         }
     }
+}
+
+int Oled::MirrorFrame(uint8_t* f) {
+    if (_web == 0) return 0;
+    int c = _web_next;
+    while (!(_web & (1u << c))) c = (c + 1) % kChunks;
+    _web &= static_cast<uint8_t>(~(1u << c));
+    _web_next = static_cast<uint8_t>((c + 1) % kChunks);
+
+    const uint8_t* src = &_sent[c * kChunk];
+    const uint8_t head[7] = { 0xF0, 0x7D, 0x53, 0x4F, 0x01,
+                              static_cast<uint8_t>(c / 2), static_cast<uint8_t>((c % 2) * kChunk) };
+    std::memcpy(f, head, sizeof(head));
+    int n = sizeof(head);
+    for (int i = 0; i < kChunk; i += 7) {
+        uint8_t& top = f[n++];
+        top = 0;
+        for (int j = 0; j < 7 && i + j < kChunk; j++) {
+            top |= static_cast<uint8_t>((src[i + j] >> 7) << j);
+            f[n++] = src[i + j] & 0x7F;
+        }
+    }
+    f[n++] = 0xF7;
+    return n;
 }
 
 void Oled::Flush() {

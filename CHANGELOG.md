@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Added pad touches over USB MIDI: a web page can press pads as a finger would, including the P10/P11 gestures. Pads let go 2 s after the last message.
+- Added the OLED over USB MIDI while a page is connected, with or without a screen fitted.
+
 ## 0.1.0 (2026-11-08)
 
 First release.

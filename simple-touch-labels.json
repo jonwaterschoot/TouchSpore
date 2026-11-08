@@ -46,6 +46,11 @@
   "device": {
     "port": "TouchSpore",
     "request": "F0 7D 53 50 01 7E F7",
+    "live": {
+      "knobs": { "state": "7D 53 50 01 01", "cc": 22 },
+      "touch": "7D 53 50 01 02",
+      "oled": { "rows": 32 }
+    },
     "settings": [
       {
         "id": "root", "label": "Root note", "widget": "buttons", "cc": 20, "channel": 16,

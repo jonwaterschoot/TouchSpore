@@ -123,7 +123,7 @@ private:
     uint8_t  _sent_state[11] = {};
     uint16_t _link_ticks = 0;         // passes left of the frames, 0 = no page connected
     uint8_t  _link_beat = 0;
-    uint8_t  _live_wait = 0, _state_wait = 0;
+    uint8_t  _live_wait = 0, _state_wait = 0, _oled_wait = 0;
 
 #ifdef USB_MIDI
     daisy::MidiUsbHandler  _midi_usb;

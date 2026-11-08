@@ -41,6 +41,11 @@ public:
     void Recalibrate();                   // call after attaching/removing clips
     void SetListener(FieldListener* l) { _listener = l; }
 
+    // A touch from the web manual, force 0..1, 0 = let go. It acts on the electrode reading,
+    // so strikes, releases and the P10/P11 gestures run as for a finger. All presses end
+    // ~2 s after the last call: a page that closes can't leave a pad held.
+    void SetPress(uint8_t pad, float force);
+
     // 0 = needs a firm touch … 1 = reacts to presence, wires act as antennas, noise becomes music
     void  SetSensitivity(float s);
     float Sensitivity() const { return _sens; }
@@ -104,6 +109,8 @@ private:
     Stats    _stats      = {};
 #endif
     FieldListener*   _listener = nullptr;
+    float    _press[12]   = {};
+    uint16_t _press_polls = 0;
     std::array<Electrode, spore::kElectrodes> _el;
 
     Profile _profile  = Profile::Smooth;

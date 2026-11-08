@@ -153,6 +153,9 @@ Out: plinks on ch 1, pad chords on ch 2. Over USB, CC 20 and CC 21 on ch 16 repo
 |---|---|
 | Live | `F0 7D 53 54 01 <SW1> <SW2> <P00–P06> <P07–P11> F7`. Switches: 0 up, 1 centre, 2 down. One bit per firm-touched pad |
 | State | `F0 7D 53 50 01 01 <S30–S37> <root> <scale> <routing> F7`. Knobs 0–127. Routing: bit 0 = pads, bit 1 = plinks |
+| OLED | `F0 7D 53 4F 01 <page> <column> <64 bytes, 7-bit packed> F7`. One changed half page per ~8 ms. Sent with or without a screen fitted |
+
+To touch a pad from a page, send `F0 7D 53 50 01 02 <force per pad, 12 bytes, 0 = up> F7`. It acts as a finger on the pad, including the P10/P11 gestures. Pads let go 2 s after the last frame, so repeat it while one is held.
 
 ## Build
 

@@ -20,7 +20,8 @@ Built with the Daisy Toolchain against the pinned libDaisy (text + data of the r
 | + boot animation | 121,516 B | 9,556 B |
 | + settings storage, scale and root gestures | 125,852 B | 5,220 B |
 | + MIDI notes and knobs in, web manual link | 126,868 B | 4,204 B |
-| + `Setup()` / `Loop()` split (today) | 126,876 B | 4,196 B |
+| + `Setup()` / `Loop()` split | 126,876 B | 4,196 B |
+| + page touches and OLED frames | 127,364 B | 3,708 B |
 
 The OLED added 12,440 B, more than the 5,096 B estimated from TouchVink's blocking driver. About 7 KB of it is libDaisy's interrupt-driven I2C HAL, which any I2C DMA transfer links in full (slave modes included). Font_6x8 is 1.5 KB, our driver and screen about 2.5 KB.
 
@@ -103,6 +104,8 @@ A connected device plays notes and sets knobs. The page sets root and scale, and
 | CC 22–29 | S30–S37, any channel, until the knob is moved | |
 | Shared live frame | | `F0 7D 53 54 01 <SW1> <SW2> <pads lo7> <pads hi5> F7`, the "live labels" frame on the labels roadmap. Switches: 0 up, 1 centre, 2 down |
 | TouchSpore frame | REQUEST `F0 7D 53 50 01 7E F7` | STATE `F0 7D 53 50 01 01 <S30–S37> <root> <scale> <routing> F7` ("SP"). Knobs 0–127, routing bit 0 = pads, bit 1 = plinks |
+| Page touch | `F0 7D 53 50 01 02 <force per pad, 12 bytes, 0 = up> F7`. Acts as a finger on the electrodes. Ends 2 s after the last frame | |
+| OLED frame | | `F0 7D 53 4F 01 <page> <column> <64 bytes, 7-bit packed> F7`, one half page per ~8 ms while linked, with or without a screen fitted |
 
 The CC echo goes out on every change, from any source, and lets the library read and write settings with no TouchSpore-specific code. The frames are for the mirror. They run for 10 s after each REQUEST (the page re-sends it every 3 s), at most every 33 ms per frame type. A REQUEST and the 500 ms heartbeat re-send the CCs and both frames. Knob values in STATE are the values in effect, so a knob held by MIDI reports the MIDI value. Pads report firm touches, independent of S37.
 
@@ -183,7 +186,7 @@ simple-touch-labels:
 
 - [ ] 5.1 Spec: `device` (port name, live frame version, settings with `cc`, `channel`, `options` / `range` / `type`) in the label format spec, with a JSON Schema entry.
 - [x] 5.2 Player and test bench: a mode switch, Play in browser ↔ Connect to Simple Touch. Connected, no firmware runs in the page, it picks the Web MIDI in/out ports whose name contains `device.port`, sends REQUEST, and the panel reads and writes only the board. In Play in browser one device cannot be both MIDI in and MIDI out.
-- [ ] 5.2b Player: the drawing follows the live frame in Connect to Simple Touch (pads lit, levers, mode labels follow SW1/SW2).
+- [x] 5.2b Player and test bench: in Connect to Simple Touch the drawing follows the board (pads, levers, knobs, mode labels), knobs and pads on the page move the board, and the OLED shows on the page, with or without a screen fitted. Levers are read-only. Format in simple-touch-web's README, "Live link". TouchVink and TouchPlaited can use the same OLED frame.
 - [x] 5.3 Player and test bench: a panel built from `device` by simple-touch-web's `web/device-panel.js`: `buttons` send on click, `select` has a Send button, `presets` send several messages. Nothing is highlighted until the first report. Ranges and toggles later.
 - [ ] 5.4 Designer: edit `device.settings` in the Firmware tab, and fill it from the MIDI column where possible.
 - [ ] 5.5 Later: firmware-specific readouts (intensity, chord, CPU) declared by byte offset in the firmware's own SysEx frame.
