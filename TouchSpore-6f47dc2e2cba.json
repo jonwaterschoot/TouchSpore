@@ -1,0 +1,13 @@
+{
+  "target": "TouchSpore",
+  "file": "TouchSpore-6f47dc2e2cba.wasm",
+  "abi": "simple-touch-web/1",
+  "sha256": "6f47dc2e2cbac8daad058f570e56068781ede9ef736dd283d52e62cfd53f4d44",
+  "bytes": 107496,
+  "url": "https://raw.githubusercontent.com/jonwaterschoot/TouchSpore/simple-touch-web/TouchSpore-6f47dc2e2cba.wasm",
+  "source": {
+    "repository": "jonwaterschoot/TouchSpore",
+    "commit": "32c58045a12c483f90a7f0c792f293f0db970976"
+  },
+  "built": "2026-11-08T18:10:58.873Z"
+}
