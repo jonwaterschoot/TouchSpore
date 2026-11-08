@@ -28,6 +28,7 @@ struct NoteOut {
     uint8_t channel;
     uint8_t note;
     uint8_t velocity;  // 0 = note off
+    bool    generated; // a plink from autoplay or a flicker, not a strike or a chord
 };
 
 // Platform-independent engine (only depends on DaisySP) so it can also be
@@ -74,10 +75,10 @@ public:
 private:
     void _Step();
     void _OnTouch(const TouchEvent& e);
-    void _TriggerPlink(int degree, float vel);
+    void _TriggerPlink(int degree, float vel, bool generated = false);
     void _PlayPlink(int note, float vel, float shape, float tone);
     void _VoicePads(bool jump);
-    void _SendMidi(uint8_t ch, uint8_t note, uint8_t vel) { _midi_q.Push({ ch, note, vel }); }
+    void _SendMidi(uint8_t ch, uint8_t note, uint8_t vel, bool generated = false) { _midi_q.Push({ ch, note, vel, generated }); }
     float _Drunk(float& walk, float step, float limit);
 
     float _sr = 48000.f;

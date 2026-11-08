@@ -199,7 +199,7 @@ void Engine::_Step() {
     // 3. Density filter decides what actually sounds ................................
     NoteChoice notes[3];
     uint8_t k = _filter.Filter(cands, n, step_in_bar, chord, chord_n, size, notes, _rng);
-    for (uint8_t i = 0; i < k; i++) _TriggerPlink(notes[i].degree, notes[i].vel);
+    for (uint8_t i = 0; i < k; i++) _TriggerPlink(notes[i].degree, notes[i].vel, true);
 
     // 4. Harmony: change every few bars unless a P10-routed touch picked the chord ....
     bool chord_changed = false;
@@ -235,7 +235,7 @@ float Engine::_Drunk(float& walk, float step, float limit) {
     return walk;
 }
 
-void Engine::_TriggerPlink(int degree, float vel) {
+void Engine::_TriggerPlink(int degree, float vel, bool generated) {
     const int size = _tuning.Size();
     float tone = _plink_tone, shape = _plink_shape;
 
@@ -257,7 +257,7 @@ void Engine::_TriggerPlink(int degree, float vel) {
 
     for (auto& o : _offs) {
         if (o.steps == 0) {
-            _SendMidi(kPlinkMidiChannel, static_cast<uint8_t>(note), vel7(vel));
+            _SendMidi(kPlinkMidiChannel, static_cast<uint8_t>(note), vel7(vel), generated);
             o.note = static_cast<uint8_t>(note);
             o.steps = kPlinkGateSteps;
             break;

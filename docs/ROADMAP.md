@@ -22,6 +22,7 @@ Built with the Daisy Toolchain against the pinned libDaisy (text + data of the r
 | + MIDI notes and knobs in, web manual link | 126,868 B | 4,204 B |
 | + `Setup()` / `Loop()` split | 126,876 B | 4,196 B |
 | + page touches and OLED frames | 127,364 B | 3,708 B |
+| + pad hits for the web manual | 127,892 B | 3,180 B |
 
 The OLED added 12,440 B, more than the 5,096 B estimated from TouchVink's blocking driver. About 7 KB of it is libDaisy's interrupt-driven I2C HAL, which any I2C DMA transfer links in full (slave modes included). Font_6x8 is 1.5 KB, our driver and screen about 2.5 KB.
 
@@ -105,6 +106,7 @@ A connected device plays notes and sets knobs. The page sets root and scale, and
 | Shared live frame | | `F0 7D 53 54 01 <SW1> <SW2> <pads lo7> <pads hi5> F7`, the "live labels" frame on the labels roadmap. Switches: 0 up, 1 centre, 2 down |
 | TouchSpore frame | REQUEST `F0 7D 53 50 01 7E F7` | STATE `F0 7D 53 50 01 01 <S30–S37> <root> <scale> <routing> F7` ("SP"). Knobs 0–127, routing bit 0 = pads, bit 1 = plinks |
 | Page touch | `F0 7D 53 50 01 02 <force per pad, 12 bytes, 0 = up> F7`. Acts as a finger on the electrodes. Ends 2 s after the last frame | |
+| Hits frame | | `F0 7D 53 50 01 03 <level per pad, 12 bytes> F7`, at most every ~16 ms, only when a pad played |
 | OLED frame | | `F0 7D 53 4F 01 <page> <column> <64 bytes, 7-bit packed> F7`, one half page per ~8 ms while linked, with or without a screen fitted |
 
 The CC echo goes out on every change, from any source, and lets the library read and write settings with no TouchSpore-specific code. The frames are for the mirror. They run for 10 s after each REQUEST (the page re-sends it every 3 s), at most every 33 ms per frame type. A REQUEST and the 500 ms heartbeat re-send the CCs and both frames. Knob values in STATE are the values in effect, so a knob held by MIDI reports the MIDI value. Pads report firm touches, independent of S37.
