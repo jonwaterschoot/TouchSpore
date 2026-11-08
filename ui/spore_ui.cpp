@@ -9,7 +9,13 @@ using namespace daisysp;
 
 namespace {
 constexpr uint16_t kTapMaxTicks   = 150;   // < 0.6 s counts as a tap
+#ifdef SIMPLE_TOUCH_WEB
+// A mouse needs two right-clicks and a trip to the third control, and an armed recalibration
+// refuses the volume, scale and root gestures.
+constexpr uint16_t kRecalTicks    = 2500;  // ~10 s both pads held arms a recalibration
+#else
 constexpr uint16_t kRecalTicks    = 625;   // ~2.5 s both pads held arms a recalibration
+#endif
 constexpr uint16_t kRecalWaitTicks = 75;   // ~0.3 s with both let go before it runs
 constexpr uint16_t kRecalLockTicks = 125;  // ~0.5 s after it: P10/P11 ignored (Field relearns baselines)
 constexpr uint16_t kBlinkTicks    = 50;    // 200 ms per blink (100 on, 100 off), distinct from touch flashes

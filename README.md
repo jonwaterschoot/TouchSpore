@@ -174,7 +174,7 @@ node ../simple-touch-web/scripts/build.mjs .
 node ../simple-touch-web/test/smoke.mjs build-web/TouchSpore.wasm
 ```
 
-The browser has no QSPI flash, so volume, scale and root return to their defaults on every load. Strikes play as on the panel. Flickers, the aura and the top half of S37 do nothing, because the browser's touch chip has no noise.
+The browser has no QSPI flash, so volume, scale and root return to their defaults on every load. Strikes play as on the panel. Flickers, the aura and the top half of S37 do nothing, because the browser's touch chip has no noise. Recalibrate needs a 10 s hold of P10 + P11 there (2.5 s on the board), which leaves time to reach S36, P00 or P02–P09 with a mouse.
 
 ### Release
 
