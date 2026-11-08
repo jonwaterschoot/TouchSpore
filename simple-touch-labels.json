@@ -42,5 +42,18 @@
     "sha256": "5f3bb1a151d62f830ffcfd92954c357966157ec65fb139202f0b5906d3670a51",
     "embed": "allowed",
     "oled": true
+  },
+  "device": {
+    "request": "F0 7D 53 50 01 7E F7",
+    "settings": [
+      {
+        "id": "root", "label": "Root note", "widget": "buttons", "cc": 20, "channel": 16,
+        "options": ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+      },
+      {
+        "id": "scale", "label": "Scale", "widget": "select", "cc": 21, "channel": 16,
+        "options": ["Natural minor", "Dorian", "Minor pentatonic", "Phrygian", "Major", "Lydian", "Major pentatonic", "Harmonic minor"]
+      }
+    ]
   }
 }

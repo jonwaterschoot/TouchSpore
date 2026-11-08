@@ -161,7 +161,7 @@ Known gap in the browser: the board's MPR121 is noise-free, with a fixed baselin
 
 The library player today connects Web MIDI ports to the *browser build* (`play.js`: `midiFromPort` → `st.sendMidi`). It can't mirror or configure a *hardware* device. TouchVink's own web manual can, but only for TouchVink. The aim is a generic device link that any firmware gets by declaring it in its label file.
 
-Proposed `device` block in `simple-touch-labels.json`:
+Original proposal for the `device` block in `simple-touch-labels.json`. The format that shipped is in [simple-touch-web's README](https://github.com/jonwaterschoot/simple-touch-web#settings-and-presets): `port` and `live` wait for 5.2, each setting names a `widget`, and `presets` are added.
 
 ```json
 "device": {
@@ -183,12 +183,13 @@ simple-touch-labels:
 
 - [ ] 5.1 Spec: `device` (port name, live frame version, settings with `cc`, `channel`, `options` / `range` / `type`) in the label format spec, with a JSON Schema entry.
 - [ ] 5.2 Player: a source switch, Browser build ↔ Device. Device picks the Web MIDI in/out ports whose name contains `device.port`, sends REQUEST, and drives the panel from the live frame (pads lit, levers, mode labels follow SW1/SW2).
-- [ ] 5.3 Player: a Settings panel built from `device.settings` (dropdowns, toggles, ranges). Greyed out until the first echo arrives. Shown for both sources.
+- [x] 5.3 Player and test bench: a panel built from `device` by simple-touch-web's `web/device-panel.js`: `buttons` send on click, `select` has a Send button, `presets` send several messages. Nothing is highlighted until the first report. Ranges and toggles later.
 - [ ] 5.4 Designer: edit `device.settings` in the Firmware tab, and fill it from the MIDI column where possible.
 - [ ] 5.5 Later: firmware-specific readouts (intensity, chord, CPU) declared by byte offset in the firmware's own SysEx frame.
 
 simple-touch-web:
 
+- [x] 5.5b USB MIDI into the browser build: `MidiUsbTransport::RxActive()` always returned true, so `Listen()` never started receiving and MIDI in was dropped. Fixed in the board. Needs the `v1` tag moved before CI picks it up.
 - [ ] 5.6 MPR121 noise model: per-electrode jitter and slow drift, and electrode 13 as the sum of all pads, so flickers and the aura run in the browser. Off by default, so existing builds keep their hashes and sound.
 - [ ] 5.7 `PersistentStorage` backed by `localStorage` (already "Later" on the labels roadmap). Then TouchSpore's browser build remembers its scale too, and the `#ifndef` from 1.5 can go.
 
