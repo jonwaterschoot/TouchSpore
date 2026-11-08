@@ -12,7 +12,7 @@ endif
 USE_DAISYSP_LGPL = 1
 
 # Sources
-CPP_SOURCES = TouchSpore.cpp $(wildcard touch/*.cpp) $(wildcard engine/*.cpp) $(wildcard ui/*.cpp)
+CPP_SOURCES = TouchSpore.cpp common/spi_stub.cpp $(wildcard touch/*.cpp) $(wildcard engine/*.cpp) $(wildcard ui/*.cpp)
 C_INCLUDES = -Ilib/ -Icommon/ -Itouch/ -Iengine/ -Iui/
 
 # Library Locations
@@ -24,6 +24,12 @@ SYSTEM_FILES_DIR = $(LIBDAISY_DIR)/core
 include $(SYSTEM_FILES_DIR)/Makefile
 
 CPP_STANDARD = -std=gnu++17
+
+# Control code runs at 250 Hz in the main loop, so build it for size (-Os). The audio
+# callback code (engine.cpp, fx.cpp) keeps the default -O2. sequencer.cpp also runs in
+# the audio callback (Engine::_Step): move it back to -O2 if the audio load rises.
+OS_OBJECTS = TouchSpore.o spore_ui.o field.o knobs.o switches.o sequencer.o
+$(addprefix $(BUILD_DIR)/,$(OS_OBJECTS)): OPT = -Os
 
 libs:
 	cd $(LIBDAISY_DIR) && "$(MAKE)"

@@ -126,7 +126,7 @@ git submodule add https://github.com/electro-smith/DaisySP.git lib/DaisySP
 git submodule update --init --recursive
 make libs -j8 && make -j8 && make program-dfu
 ```
-Flash: ~119 KB of 128 KB.
+Flash: ~109 KB of 128 KB.
 
 ### Release
 

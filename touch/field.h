@@ -57,6 +57,13 @@ public:
 
     Profile CurrentProfile() const { return _profile; }
 
+#if DEBUG
+    // For the serial log in TouchSpore.cpp: how often _Configure() ran, why, and the
+    // last ECR value the health check read back.
+    struct Stats { uint16_t configs, by_ecr, by_fails; uint8_t last_ecr; };
+    Stats TakeStats() { Stats s = _stats; _stats.configs = _stats.by_ecr = _stats.by_fails = 0; return s; }
+#endif
+
 private:
     NOCOPY(Field)
 
@@ -90,6 +97,9 @@ private:
     uint16_t _chip_touch = 0;      // MPR121 touch status bits
     uint16_t _fails      = 0;      // consecutive failed reads
     uint16_t _health     = 0;      // polls until the next chip check
+#if DEBUG
+    Stats    _stats      = {};
+#endif
     FieldListener*   _listener = nullptr;
     std::array<Electrode, spore::kElectrodes> _el;
 

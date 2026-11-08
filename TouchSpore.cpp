@@ -24,7 +24,7 @@ static float DSY_SDRAM_BSS delay_r[spore::kDelayMaxSamples];
 // controls freeze, so it watches SporeUI::Beat(). After ~1 s without a main-loop pass it
 // takes over the LED and blinks a code, then a 1.5 s pause, repeating:
 //   1–7 blinks = stuck in that SporeUI::Stage (1 MIDI in, 2 touch chip/I2C, 3 knobs & switches,
-//                4 P10/P11, 5 intensity, 6 MIDI out, 7 the loop's Delay)
+//                4 P10/P11, 5 intensity, 6 MIDI out, 7 LED and the wait for the next 4 ms tick)
 //   8 blinks   = audio CPU overload: the main loop is starved, not stuck
 // Blocks are 1 ms (48 samples at 48 kHz), so the counters below are in ms.
 void Watchdog() {
@@ -66,8 +66,44 @@ int main(void) {
 
     hw.StartAudio(AudioCallback);
 
+    // Fixed 4 ms period: wait for the next tick instead of a Delay(4) after the work,
+    // so a long pass (OLED page, settings save) doesn't stretch timings that count
+    // passes (tap, recalibrate hold). A pass that overruns by more than a period
+    // restarts the schedule instead of running catch-up passes back to back.
+    constexpr uint32_t kPeriodMs = 4;
+    uint32_t next = System::GetNow();
+#if DEBUG
+    // `make DEBUG=1`: no USB MIDI (config.h), the USB port is a serial log instead.
+    // Every 2 s: audio load avg/max, the longest main-loop pass, and how often the MPR121
+    // was re-configured (by the ECR health check or by failed reads). Then the counters reset.
+    // Ticks, not GetUs(): GetUs() wraps every ~21 s and breaks the subtraction.
+    hw.StartLog(false);
+    const uint32_t ticks_per_us = System::GetTickFreq() / 1000000u;
+    uint32_t log_at = System::GetNow(), pass_max_ticks = 0;
+#endif
     while (1) {
+#if DEBUG
+        const uint32_t t0 = System::GetTick();
+#endif
         ui.Process(hw);
-        System::Delay(4);
+#if DEBUG
+        const uint32_t dt = System::GetTick() - t0;
+        if (dt > pass_max_ticks) pass_max_ticks = dt;
+        if (System::GetNow() - log_at >= 2000) {
+            log_at = System::GetNow();
+            const auto st = touch.field().TakeStats();
+            hw.PrintLine("cpu avg %d.%d %%  max %d.%d %%  pass max %u us  config %u (ecr %u, fails %u)  ecr 0x%02X",
+                         int(cpu.GetAvgCpuLoad() * 100.f), int(cpu.GetAvgCpuLoad() * 1000.f) % 10,
+                         int(cpu.GetMaxCpuLoad() * 100.f), int(cpu.GetMaxCpuLoad() * 1000.f) % 10,
+                         unsigned(pass_max_ticks / ticks_per_us),
+                         unsigned(st.configs), unsigned(st.by_ecr), unsigned(st.by_fails), unsigned(st.last_ecr));
+            cpu.Reset();
+            pass_max_ticks = 0;
+        }
+#endif
+        next += kPeriodMs;
+        if (static_cast<int32_t>(System::GetNow() - next) > static_cast<int32_t>(kPeriodMs))
+            next = System::GetNow();
+        while (static_cast<int32_t>(System::GetNow() - next) < 0) {}
     }
 }

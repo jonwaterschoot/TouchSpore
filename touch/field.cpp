@@ -53,6 +53,9 @@ void Field::Init(DaisySeed& hw) {
 void Field::_Configure(Profile p) {
     _profile = p;
     _health = kHealthPolls;
+#if DEBUG
+    _stats.configs++;
+#endif
 
     // No answer: don't stall the main loop on ~60 more timeouts; _CheckChip retries later
     if (!_WriteRegister(0x80, 0x63)) return;   // soft reset
@@ -135,6 +138,9 @@ void Field::_UpdateDerived() {
 bool Field::_CheckChip() {
     if (_fails >= kFailPolls) {
         _fails = 0;
+#if DEBUG
+        _stats.by_fails++;
+#endif
         _i2c.Init(_i2c_cfg);
         _Configure(_profile);
         return false;
@@ -142,7 +148,12 @@ bool Field::_CheckChip() {
     if (_health > 0 && --_health > 0) return true;
     _health = kHealthPolls;
     uint8_t ecr = 0;
-    if (_ReadBurst(0x5E, &ecr, 1) && ecr != kEcrRun) {
+    const bool read_ok = _ReadBurst(0x5E, &ecr, 1);
+#if DEBUG
+    if (read_ok) _stats.last_ecr = ecr;
+    if (read_ok && ecr != kEcrRun) _stats.by_ecr++;
+#endif
+    if (read_ok && ecr != kEcrRun) {
         _Configure(_profile);
         return false;
     }
