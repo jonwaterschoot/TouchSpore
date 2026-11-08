@@ -44,6 +44,7 @@
     "oled": true
   },
   "device": {
+    "port": "TouchSpore",
     "request": "F0 7D 53 50 01 7E F7",
     "settings": [
       {
