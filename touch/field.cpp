@@ -33,9 +33,13 @@ bool Field::_WriteRegister(uint8_t reg, uint8_t val) {
     return _i2c.TransmitBlocking(kAddr, buf, 2, 10) == I2CHandle::Result::OK;
 }
 
+// Repeated start between the register address and the read, as libDaisy's Mpr121 driver
+// does. With a STOP in between, the MPR121 read from 0x00 whatever start_reg was: the
+// burst at 0x00 worked by luck, and the ECR health check read the touch status, failed,
+// and re-configured the chip every second (a 94 ms main-loop stall and 0.5 s of
+// baseline relearning each time).
 bool Field::_ReadBurst(uint8_t start_reg, uint8_t* buffer, uint16_t size) {
-    if (_i2c.TransmitBlocking(kAddr, &start_reg, 1, 10) != I2CHandle::Result::OK) return false;
-    return _i2c.ReceiveBlocking(kAddr, buffer, size, 10) == I2CHandle::Result::OK;
+    return _i2c.ReadDataAtAddress(kAddr, start_reg, 1, buffer, size, 10) == I2CHandle::Result::OK;
 }
 
 void Field::Init(DaisySeed& hw) {

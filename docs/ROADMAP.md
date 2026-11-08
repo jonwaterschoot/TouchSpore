@@ -38,11 +38,19 @@ SRAM is 92.5 % used (485 KB of 512 KB), almost all of it `spore::Engine` (418 KB
 
 ### CPU
 
-Not measured on hardware yet. Everything planned here runs in the main loop, and the audio callback gets no new work. Step 0.3 measures the audio load so later DSP has a number to plan against.
+Measured 2026-11-08 (`make DEBUG=1`, serial log every 2 s):
+
+| State | Audio avg | Audio max | Longest main-loop pass |
+|---|---|---|---|
+| Idle, autoplay off | 22 % | 23 % | 1.0 ms |
+| Autoplay on, not touched | 42 % | 43 % | 1.6 ms |
+| Playing, autoplay on | 49–63 % | 52–69 % | 1.3–2.7 ms |
+
+Everything planned here runs in the main loop, and the audio callback gets no new work.
 
 Main-loop timing does change, and several timings count loop passes (tap < 150 passes, recalibrate 360 passes, ~250 Hz):
 
-- **OLED.** One 128-byte page takes ~3 ms at 400 kHz, so a full 4-page redraw takes ~12 ms. The dirty-page driver only sends pages that changed. Cap it at one page per pass and 20 frames/s.
+- **OLED.** One 128-byte page takes ~3.3 ms of bus time at 400 kHz, and a blocking transfer stretches with the audio load (the audio interrupt preempts it). With passes up to 2.7 ms, a full page per pass overruns the 4 ms period. Plan: send the OLED by I2C DMA right after the touch read, so the transfer runs while the rest of the pass and the wait run, in 64-column half pages (~1.7 ms). The touch read waits for a transfer still in flight. The dirty-page driver only sends what changed. 20 frames/s max.
 - **Settings save.** `PersistentStorage::Save()` erases a 4 KB QSPI sector (45 ms typical, 300 ms max) and blocks the main loop for that time. Audio keeps running (code runs from internal flash), but pads and knobs pause. Save 5 s after the last change, never on every change.
 - **USB SysEx.** With no app reading the port, every failed TX burns ~100 µs (see `tx_retry_count` in `ui/spore_ui.cpp`). Stream telemetry only after the page has asked for it.
 
@@ -57,11 +65,12 @@ Electrically it is untested. The SSD1306 runs a charge pump, and its supply curr
 
 ## Phase 0: room and a CPU number
 
-- [ ] 0.1 SPI stub in `common/` with a comment saying why. Hardware check: boots, audio, USB MIDI, pads, knobs.
-- [ ] 0.2 `-Os` for `TouchSpore.o`, `spore_ui.o`, `field.o`, `knobs.o`, `switches.o`, `sequencer.o` in the Makefile. Listen for changes in the sequencer timing (it runs in the audio callback through `Engine::_Step`, so move it back to `-O2` if the load rises).
-- [ ] 0.3 Measure audio CPU: `cpu.GetAvgCpuLoad()` / `GetMaxCpuLoad()` under the worst case (6 plinks, 4 pads, reverb/delay/chorus up, SW2 up, S37 at the top with clips). Log it over USB serial in a `DEBUG = 1` build and note it here.
-- [ ] 0.4 Fixed 4 ms loop period: wait until the next 4 ms tick instead of `System::Delay(4)` after the work, so OLED pages and saves don't stretch the pass-counted timings.
-- [ ] 0.5 Update the README's flash line.
+- [x] 0.1 SPI stub in `common/spi_stub.cpp`. Flash 108,596 B (−10,140 B with 0.2), `spi.o` no longer linked.
+- [x] 0.1b Hardware check for 0.1, 0.2 and 0.4: boots, audio, USB MIDI, pads, knobs, tap and recalibrate timing.
+- [x] 0.2 `-Os` for `TouchSpore.o`, `spore_ui.o`, `field.o`, `knobs.o`, `switches.o`, `sequencer.o` in the Makefile. Listen for changes in the sequencer timing (it runs in the audio callback through `Engine::_Step`, so move it back to `-O2` if the load rises).
+- [x] 0.3 Measure audio CPU (see CPU above). The log found the MPR121 being re-configured every second (fixed, see `Field::_ReadBurst`): `cpu.GetAvgCpuLoad()` / `GetMaxCpuLoad()` under the worst case (6 plinks, 4 pads, reverb/delay/chorus up, SW2 up, S37 at the top with clips). Log it over USB serial in a `DEBUG = 1` build and note it here.
+- [x] 0.4 Fixed 4 ms loop period: wait until the next 4 ms tick instead of `System::Delay(4)` after the work, so OLED pages and saves don't stretch the pass-counted timings.
+- [x] 0.5 Update the README's flash line.
 
 ## Phase 1: remember scale and root
 
@@ -104,6 +113,8 @@ The CC echo lets the library read and write settings with no TouchSpore-specific
 
 - [ ] 3.1 Port TouchVink's `display/oled_screen.*` and `oled_dirty_driver.h`. Start with Font_6x8 only. Add a larger font only if the budget allows after 3.3.
 - [ ] 3.2 Probe 0x3C at boot. Init at 400 kHz. One page per pass, 20 frames/s max.
+- [ ] 3.3a One screen, Font_6x8 only (decided 2026-11-08). Row 0: last touched control and its value. Rows 2–3: one column per scale note (5 or 7), PL row flashes each plink note, PD row shows the chord tones. Right of the grid: root and scale, current chord. Note names use `#` (`C#`, `C#4`): Font_6x8 is ASCII only.
+- [ ] 3.3b Boot: `TOUCHSPORE` overgrown by branching hyphae (~1 s), held on screen while Field learns baselines, so the pads calibrate with the screen running.
 - [ ] 3.3 Screens, all from the same state struct as the telemetry (TouchVink does the same, so the screen and the page can't disagree):
   - boot: name and version
   - touched control: name + value in units (reverb %, delay %, highest note D5/D6/D7, sensitivity %)
