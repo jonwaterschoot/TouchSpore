@@ -161,7 +161,7 @@ Known gap in the browser: the board's MPR121 is noise-free, with a fixed baselin
 
 The library player today connects Web MIDI ports to the *browser build* (`play.js`: `midiFromPort` → `st.sendMidi`). It can't mirror or configure a *hardware* device. TouchVink's own web manual can, but only for TouchVink. The aim is a generic device link that any firmware gets by declaring it in its label file.
 
-Original proposal for the `device` block in `simple-touch-labels.json`. The format that shipped is in [simple-touch-web's README](https://github.com/jonwaterschoot/simple-touch-web#settings-and-presets): `port` and `live` wait for 5.2, each setting names a `widget`, and `presets` are added.
+Original proposal for the `device` block in `simple-touch-labels.json`. The format that shipped is in [simple-touch-web's README](https://github.com/jonwaterschoot/simple-touch-web#settings-and-presets): `live` waits for 5.2b, each setting names a `widget`, and `presets` are added.
 
 ```json
 "device": {
@@ -182,7 +182,8 @@ A setting writes by sending its CC and shows the value the device echoes back, s
 simple-touch-labels:
 
 - [ ] 5.1 Spec: `device` (port name, live frame version, settings with `cc`, `channel`, `options` / `range` / `type`) in the label format spec, with a JSON Schema entry.
-- [ ] 5.2 Player: a source switch, Browser build ↔ Device. Device picks the Web MIDI in/out ports whose name contains `device.port`, sends REQUEST, and drives the panel from the live frame (pads lit, levers, mode labels follow SW1/SW2).
+- [x] 5.2 Player and test bench: a source switch, Browser build ↔ Device. Device runs no firmware in the page, picks the Web MIDI in/out ports whose name contains `device.port`, sends REQUEST, and the panel reads and writes only the board. In Browser build mode one device cannot be both MIDI in and MIDI out.
+- [ ] 5.2b Player: the drawing follows the live frame in Device mode (pads lit, levers, mode labels follow SW1/SW2).
 - [x] 5.3 Player and test bench: a panel built from `device` by simple-touch-web's `web/device-panel.js`: `buttons` send on click, `select` has a Send button, `presets` send several messages. Nothing is highlighted until the first report. Ranges and toggles later.
 - [ ] 5.4 Designer: edit `device.settings` in the Firmware tab, and fill it from the MIDI column where possible.
 - [ ] 5.5 Later: firmware-specific readouts (intensity, chord, CPU) declared by byte offset in the firmware's own SysEx frame.
