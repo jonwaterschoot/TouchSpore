@@ -37,6 +37,7 @@ constexpr uint16_t kLinkTicks     = 2500;  // ~10 s after the last REQUEST: fram
 constexpr uint8_t  kLinkBeatTicks = 125;   // ~500 ms: everything re-sent while linked
 constexpr uint8_t  kFrameTicks    = 8;     // ~33 ms: fastest rate per frame type
 constexpr uint8_t  kOledTicks     = 2;     // ~8 ms per half page: a full screen in ~64 ms
+constexpr uint8_t  kHitTicks      = 4;     // ~16 ms between hits frames
 
 // SysEx bodies, without F0 and F7 (libDaisy strips those)
 const uint8_t kRequest[5] = { 0x7D, 0x53, 0x50, 0x01, 0x7E };
@@ -114,12 +115,14 @@ void SporeUI::OnStrike(uint8_t pad, float velocity) {
 
     _recent =fminf(_recent + 0.12f + 0.25f * velocity, 1.5f);
     _flash = kStrikeFlash;
+    if (_Targets() & kToPlinks) _Hit(pad, velocity);   // the chord engine doesn't light pads
     _engine.PushTouch({ TouchEvent::Strike, pad, velocity, _Targets() });
 }
 
 void SporeUI::OnFlicker(uint8_t pad, float amount) {
     _recent = fminf(_recent + 0.02f + 0.04f * amount, 1.5f);
     if (_flash < kFlickerFlash) _flash = kFlickerFlash;
+    if (_Targets() & kToPlinks) _Hit(pad, 0.15f + 0.45f * amount);
     // Flickers only ever play plinks; pads are reserved for deliberate strikes
     _engine.PushTouch({ TouchEvent::Flicker, pad, amount, static_cast<uint8_t>(_Targets() & kToPlinks) });
 }
@@ -490,6 +493,7 @@ bool SporeUI::_SendNotes() {
     while (budget-- > 0 && _engine.PopNoteOut(n)) {
         sent = true;
         _screen.OnNote(n);
+        if (n.generated && n.velocity > 0) _HitNote(n.note, n.velocity);
         uint8_t msg[3] = {
             static_cast<uint8_t>((n.velocity ? 0x90 : 0x80) | (n.channel & 0x0F)),
             static_cast<uint8_t>(n.note & 0x7F),
@@ -503,6 +507,26 @@ bool SporeUI::_SendNotes() {
 #endif
     }
     return sent;
+}
+
+// For the web manual: pads that played a plink, firm touch or not. Only while a page is connected.
+void SporeUI::_Hit(uint8_t pad, float level) {
+    if (_link_ticks == 0 || pad >= kPads) return;
+    const uint8_t v = static_cast<uint8_t>(fclamp(level, 0.01f, 1.f) * 127.f);
+    if (v > _hits[pad]) _hits[pad] = v;
+}
+
+// A generated note has no pad. It lights the pad that plays its pitch: P00.. follow the
+// scale, and where two pads share a pitch class (pad % size), notes an octave up take the higher.
+void SporeUI::_HitNote(uint8_t note, uint8_t velocity) {
+    const ScaleDef& sc = kScales[_engine.Scale()];
+    const int rel = note - kPlinkBaseMidi - _engine.Root();
+    const int semis = Tuning::Mod(rel, 12);
+    for (int c = 0; c < sc.size; c++) {
+        if (sc.steps[c] != semis) continue;
+        _Hit(static_cast<uint8_t>(rel >= 12 && c + sc.size < kFieldPads ? c + sc.size : c), velocity / 127.f);
+        return;
+    }
 }
 
 void SporeUI::_ResendLink() {
@@ -520,6 +544,7 @@ void SporeUI::_SendLink([[maybe_unused]] bool notes_sent) {
     if (_live_wait > 0)  _live_wait--;
     if (_state_wait > 0) _state_wait--;
     if (_oled_wait > 0)  _oled_wait--;
+    if (_hit_wait > 0)   _hit_wait--;
     if (_link_ticks > 0) {
         if (--_link_ticks == 0) _oled.SetMirror(false);
         if (++_link_beat >= kLinkBeatTicks) _ResendLink();
@@ -542,6 +567,20 @@ void SporeUI::_SendLink([[maybe_unused]] bool notes_sent) {
         return;
     }
     if (_link_ticks == 0) return;
+
+    if (_hit_wait == 0) {
+        uint8_t any = 0;
+        for (uint8_t h : _hits) any |= h;
+        if (any) {
+            uint8_t frame[19] = { 0xF0, 0x7D, 0x53, 0x50, 0x01, 0x03 };
+            memcpy(frame + 6, _hits, sizeof(_hits));
+            frame[18] = 0xF7;
+            _midi_usb.SendMessage(frame, sizeof(frame));
+            memset(_hits, 0, sizeof(_hits));
+            _hit_wait = kHitTicks;
+            return;
+        }
+    }
 
     if (_live_wait == 0) {
         auto& f = _touch.field();

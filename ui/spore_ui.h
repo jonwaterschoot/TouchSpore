@@ -69,6 +69,8 @@ private:
     void _SendLink(bool notes_sent);
     void _ResendLink();
     void _SendCc(uint8_t cc, uint8_t value);
+    void _Hit(uint8_t pad, float level);
+    void _HitNote(uint8_t note, uint8_t velocity);
     void _Blink(uint8_t count) { _blink_count = count; _blink_tick = 0; }
     void _Led(daisy::DaisySeed& hw);
 
@@ -123,7 +125,8 @@ private:
     uint8_t  _sent_state[11] = {};
     uint16_t _link_ticks = 0;         // passes left of the frames, 0 = no page connected
     uint8_t  _link_beat = 0;
-    uint8_t  _live_wait = 0, _state_wait = 0, _oled_wait = 0;
+    uint8_t  _live_wait = 0, _state_wait = 0, _oled_wait = 0, _hit_wait = 0;
+    uint8_t  _hits[12] = {};          // per pad, strongest since the last hits frame, 0..127
 
 #ifdef USB_MIDI
     daisy::MidiUsbHandler  _midi_usb;
