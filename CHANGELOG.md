@@ -13,7 +13,10 @@ First release, planned as 0.1.0.
 - Added plink tone on S34 (glass → wood → saturated), attack and decay on S35, highest plink note on SW1 (D5, D6 or D7).
 - Added reverb, ping-pong delay and chorus on S30–S32, and the pads ←→ plinks mix on S36.
 - Added recalibration: hold P10 + P11 for 2.5 s, then let go. Do it after attaching or removing clips.
-- Added volume: hold P10 + P11 and move S36. Default 60 %, reset on every boot.
+- Added volume: hold P10 + P11 and move S36. Default 60 %.
+- Added scale selection on the panel: hold P10 + P11 and touch P02–P09.
+- Added root selection on the panel: hold P10 + P11, tap P00 for the next semitone, press 0.6 s for C. Each change plays the root on a plink.
+- Added saved settings: volume, scale and root load at boot. Saved to QSPI flash when their gesture ends, or 5 s after root or scale sent over MIDI (LED flickers for 0.5 s). Pads and knobs pause for up to 0.3 s during a save.
 - Added OLED support (SSD1306 128×32 at 0x3C, optional): last control, scale, plink notes, chord.
 - Added USB MIDI in: CC 20 root, CC 21 or Program Change scale, Note On ch 16 root, CC 123 all notes off. Out: plinks on ch 1, pad chords on ch 2.
 - Added TRS MIDI for boards with the TRS mod: build with `make UART_MIDI=1`. Off by default, because a floating D14 on stock boards froze the controls.
@@ -22,5 +25,4 @@ First release, planned as 0.1.0.
 
 ### Known issues
 
-- Scale and root reset to D natural minor at every boot. Saving them is Phase 1 in [docs/ROADMAP.md](docs/ROADMAP.md).
 - Not all curves are tuned on hardware yet (see "Open questions for the hardware" in the README).

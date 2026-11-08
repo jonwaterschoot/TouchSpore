@@ -17,11 +17,12 @@ Built with the Daisy Toolchain against the pinned libDaisy (text + data of the r
 | + MPR121 repeated-start fix | 107,868 B | 23,204 B |
 | + OLED: DMA driver, Font_6x8, screen | 120,308 B | 10,764 B |
 | + hidden volume, compressor change | 120,972 B | 10,100 B |
-| + boot animation (today) | 121,516 B | 9,556 B |
+| + boot animation | 121,516 B | 9,556 B |
+| + settings storage, scale and root gestures (today) | 125,852 B | 5,220 B |
 
 The OLED added 12,440 B, more than the 5,096 B estimated from TouchVink's blocking driver. About 7 KB of it is libDaisy's interrupt-driven I2C HAL, which any I2C DMA transfer links in full (slave modes included). Font_6x8 is 1.5 KB, our driver and screen about 2.5 KB.
 
-Still to come: settings storage (+3,208 B measured), the SysEx telemetry and settings echo (estimated 1.7–2.7 KB). Expected end state: 126.4–127.4 KB, so 3.7–4.7 KB free.
+Settings storage and the scale and root gestures added 4,336 B. Still to come: the SysEx telemetry and settings echo (estimated 1.7–2.7 KB). Expected end state: 127.5–128.5 KB, so 2.5–3.5 KB free.
 
 If it gets too tight:
 
@@ -54,7 +55,7 @@ Everything planned here runs in the main loop, and the audio callback gets no ne
 Main-loop timing does change, and several timings count loop passes (tap < 150 passes, recalibrate 625 passes, ~250 Hz):
 
 - **OLED.** One 128-byte page takes ~3.3 ms of bus time at 400 kHz, and a blocking transfer stretches with the audio load (the audio interrupt preempts it). With passes up to 2.7 ms, a full page per pass overruns the 4 ms period. So `Oled::Service()` starts one changed 64-column half page (~1.7 ms) by I2C DMA right after the touch read, and the transfer runs during the rest of the pass and the wait. The next touch read waits for it (`Oled::WaitIdle()`).
-- **Settings save.** `PersistentStorage::Save()` erases a 4 KB QSPI sector (45 ms typical, 300 ms max) and blocks the main loop for that time. Audio keeps running (code runs from internal flash), but pads and knobs pause. Save 5 s after the last change, never on every change.
+- **Settings save.** `PersistentStorage::Save()` erases a 4 KB QSPI sector (45 ms typical, 300 ms max) and blocks the main loop for that time. Audio keeps running (code runs from internal flash), but pads and knobs pause. Save only when a volume or scale gesture ends.
 - **USB SysEx.** With no app reading the port, every failed TX burns ~100 µs (see `tx_retry_count` in `ui/spore_ui.cpp`). Stream telemetry only after the page has asked for it.
 
 ### OLED and touch sensing
@@ -75,17 +76,18 @@ Tested 2026-11-08 (step 3.6): no extra flickers. The SSD1306 runs a charge pump,
 - [x] 0.4 Fixed 4 ms loop period: wait until the next 4 ms tick instead of `System::Delay(4)` after the work, so OLED pages and saves don't stretch the pass-counted timings.
 - [x] 0.5 Update the README's flash line.
 
-## Phase 1: remember scale and root
+## Phase 1: remember scale, root and volume
 
-Today root and scale come only from MIDI (CC 20, CC 21, Program Change, Note On ch 16) and reset to D natural minor on every boot (`engine/scale.h` defaults).
+Scale and root come from the panel gestures or MIDI (CC 20, CC 21, Program Change, Note On ch 16). Volume, root and scale load from QSPI at boot.
 
-- [ ] 1.1 `Settings { version, root, scale, to_pads, to_plinks, volume }` in `PersistentStorage` at a fixed QSPI offset well above 0 (the Daisy bootloader keeps apps at 0x90040000). Load before `engine.Init()`.
-- [ ] 1.2 `Engine::Root()` / `Engine::Scale()` getters (the values in effect, after `_pending_*` is applied in the audio callback).
-- [ ] 1.3 Save 5 s after the last change, from the main loop. LED: 1 long blink when saved.
-- [ ] 1.4 Decide whether P10/P11 routing persists too, or only root and scale.
-- [ ] 1.5 `#ifndef SIMPLE_TOUCH_WEB` around storage: the browser board has no QSPI (see Phase 4).
-- [ ] 1.6 Optional: a panel gesture for the scale, so a MIDI host isn't needed. For example, hold P10 and strike P00–P07 for scale 0–7. Conflicts with the P10 strike routing, so design it once the OLED can show the choice.
-- [ ] 1.7 README: scale and root are saved, how to reset to D minor.
+- [x] 1.1 `Settings { version, root, scale, volume }` in `PersistentStorage` at QSPI offset 0x7F0000 (`ui/spore_settings.*`). Loaded before `engine.Init()`. Blank, foreign or out-of-range data loads as defaults.
+- [ ] 1.1b Hardware check: values survive a power cycle, flicker after a save, audio doesn't drop during a save, A → B → A on the scale ends on A after a reboot. Check that a saved quiet volume doesn't start loud, that P02–P09 and P00 pick only with P10 + P11 held, that holding P10 + P11 with hands near the pads picks nothing by itself, that P00 taps step the root with a plink and a 0.6 s press gives C, and that root and scale sent over MIDI survive a reboot.
+- [x] 1.2 `Engine::Root()` / `Engine::Scale()` getters (the values in effect, after `_pending_*` is applied in the audio callback).
+- [x] 1.3 Save when a volume, scale or root gesture ends, from the main loop (decided 2026-11-08: they are deliberate and happen outside playing). Root and scale sent over MIDI save 5 s after the last change (the web manual will set them this way). LED: fast flicker for 0.5 s when saved. libDaisy skips the cache invalidate for apps in internal flash, so `SettingsStore::Save` does it before each write.
+- [x] 1.4 P10/P11 routing doesn't persist (decided 2026-11-08). Volume, scale and root do.
+- [x] 1.5 `#ifndef SIMPLE_TOUCH_WEB` around storage: the browser board has no QSPI (see Phase 4).
+- [x] 1.6 Panel gestures, with P10 + P11 held (fixed firm threshold, field notes muted). P02–P09: scale 0–7, one LED blink per pad position. P00: tap = root up a semitone, 0.6 s press = C, each change played on a plink. P01 stays free (hard to reach). Open until 2 s after the last pick with P10/P11 let go.
+- [x] 1.7 README: volume, scale and root are saved, the gestures (P02 is natural minor, P00 taps reach D).
 
 ## Phase 2: MIDI link (read and write)
 
@@ -191,7 +193,5 @@ simple-touch-web:
 
 - Does the OLED add flickers at the top of S37 with clips attached? Not with held wires (3.6).
 - Is one font enough for the screens, or does the value row need Font_11x18 (+3.4 KB)?
-- Which settings persist: root and scale only, or routing too? (1.4)
-- Panel gesture for the scale, or MIDI and the web page only? (1.6)
 - Pads and knobs as MIDI out, or keep MIDI out to the generated notes? (2.5)
 - Who keeps the `device` and live frame spec: this repo, simple-touch-labels or simple-touch-web? The labels roadmap is still waiting on Synthux about the shared label format.

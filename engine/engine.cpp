@@ -24,13 +24,15 @@ PlinkTone ToneFor(float tone) {
 }
 }
 
-void Engine::Init(float sr, float* delay_l, float* delay_r, size_t delay_len) {
+void Engine::Init(float sr, float* delay_l, float* delay_r, size_t delay_len,
+                  uint8_t root, uint8_t scale, float gain) {
     _sr = sr;
     _samples_per_step = static_cast<uint32_t>(sr * 60.f / kDefaultBpm / kStepsPerBeat);   // 0.25 s at 60 BPM
     _sample_in_step = _samples_per_step - 1;   // first step fires immediately
 
-    _tuning.SetRoot(kDefaultRoot);
-    _tuning.SetScale(kDefaultScale);
+    _tuning.SetRoot(root);
+    _tuning.SetScale(scale);
+    _volume = _volume_s = gain;
 
     for (auto& v : _plinks) v.Init(sr);
     static constexpr float kLfo[kPadVoices] = { 0.07f, 0.09f, 0.11f, 0.05f };
@@ -104,6 +106,16 @@ void Engine::Process(const float* const* in, float** out, size_t size) {
 // bypasses the grid and the density filter. Flickers (sensitive field, noise, wires) are
 // texture: they wait for the next sixteenth and go through the filter.
 void Engine::_OnTouch(const TouchEvent& e) {
+    if (e.kind == TouchEvent::Root) {
+        // Applied here instead of on the next step, so the plink plays the new root.
+        // Ignores P11 routing: this note is the only feedback with no screen fitted.
+        _tuning.SetRoot(e.pad);
+        _pending_root = -1;
+        _VoicePads(false);
+        _TriggerPlink(0, e.amount);
+        return;
+    }
+
     const int size = _tuning.Size();
     const int pc = e.pad % size;
     const float intensity = _intensity;

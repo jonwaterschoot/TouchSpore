@@ -12,11 +12,19 @@ constexpr uint16_t kRecalTicks    = 625;   // ~2.5 s both pads held arms a recal
 constexpr uint16_t kRecalWaitTicks = 75;   // ~0.3 s with both let go before it runs
 constexpr uint16_t kRecalLockTicks = 125;  // ~0.5 s after it: P10/P11 ignored (Field relearns baselines)
 constexpr uint16_t kBlinkTicks    = 50;    // 200 ms per blink (100 on, 100 off), distinct from touch flashes
+constexpr uint8_t  kSavedFlickerTicks = 125; // 500 ms of fast flicker: settings saved
+constexpr uint8_t  kSavedFlickerPeriod = 16; // ~15 Hz, faster than any blink code
 constexpr uint8_t  kStrikeFlash   = 12;    // ~50 ms LED flash per detected strike
 constexpr uint8_t  kFlickerFlash  = 2;     // ~8 ms per flicker
 constexpr int      kMidiPerLoop   = 4;     // UART TX blocks ~1 ms per message: cap the main-loop stall
 constexpr float    kKnobStep      = 0.01f; // a knob counts as moved (and shows on the OLED) past 1 %
 constexpr uint16_t kVolumeHoldTicks = 500; // ~2 s with S36 still: back from volume to mix
+constexpr uint16_t kPickWindowTicks = 500; // ~2 s after the last pick with P10/P11 let go. Longer than 8 blinks
+constexpr uint8_t  kRootPad       = 0;     // P00: tap = next root, press for kTapMaxTicks = C
+constexpr uint8_t  kFirstScalePad = 2;     // P02..P09 pick scales 0..7. P01 is hard to reach, so unused
+constexpr uint8_t  kScalePads     = 8;
+constexpr float    kRootPlinkVel  = 0.7f;
+constexpr uint16_t kMidiSaveTicks = 1250;  // ~5 s after the last root or scale sent over MIDI
 
 const char* const kKnobLabels[8] = {
     "REVERB", "DELAY", "CHORUS", "PAD BLEND", "TONE", "ATTACK/DECAY", "MIX", "SENSE",
@@ -25,6 +33,11 @@ const char* const kKnobLabels[8] = {
 
 void SporeUI::Init(DaisySeed& hw) {
     _touch.field().SetListener(this);
+
+    const Settings& saved = _settings.Get();
+    _root_pick  = saved.root;
+    _scale_pick = saved.scale;
+    _volume     = saved.volume;
 
 #ifdef USB_MIDI
     MidiUsbHandler::Config usb_cfg;
@@ -57,13 +70,25 @@ void SporeUI::Process(DaisySeed& hw) {
     _stage = kStageIdle;
     _screen.SetHarmony(_engine.Root(), _engine.Scale(), _engine.ChordRoot(), _engine.ChordTones());
     _screen.Draw();
+    if (_midi_save_wait > 0 && --_midi_save_wait == 0) _save_pending = true;
+    if (_save_pending) {
+        _save_pending = false;
+        _midi_save_wait = 0;   // every save writes all values
+        _settings.Save({ Settings::kVersion, _root_pick, _scale_pick, _volume });
+        _saved_flicker = kSavedFlickerTicks;
+    }
     _Led(hw);
 }
 
 // Field → engine ...............................................................
 
 void SporeUI::OnStrike(uint8_t pad, float velocity) {
-    _recent = fminf(_recent + 0.12f + 0.25f * velocity, 1.5f);
+    // Picking a scale or root plays no field notes. The strike can land before or after
+    // the firm touch that makes the pick, so this also covers the passes with P10 + P11 held.
+    auto& f = _touch.field();
+    if (_pick_mode || (f.IsFirmTouched(kPadSynthPad) && f.IsFirmTouched(kPlinkPad))) return;
+
+    _recent =fminf(_recent + 0.12f + 0.25f * velocity, 1.5f);
     _flash = kStrikeFlash;
     _engine.PushTouch({ TouchEvent::Strike, pad, velocity, _Targets() });
 }
@@ -123,7 +148,7 @@ void SporeUI::_ProcessFader(float s36) {
     // Enter: S36 moves while P10 + P11 are held (the recalibrate bar is filling). The
     // hold is cancelled in _ProcessModPads.
     auto& f = _touch.field();
-    if (!_vol_mode && moved && !_recal_armed && _recal_lock == 0
+    if (!_vol_mode && !_pick_mode && moved && !_recal_armed && _recal_lock == 0
         && f.IsFirmTouched(kPadSynthPad) && f.IsFirmTouched(kPlinkPad)) {
         _vol_mode = true;
     }
@@ -138,6 +163,7 @@ void SporeUI::_ProcessFader(float s36) {
             _screen.ShowControl("SET VOLUME", val);
         } else if (++_vol_idle >= kVolumeHoldTicks) {
             _vol_mode = false;
+            _save_pending = true;
             _mix_pickup = fabsf(s36 - _mix) > kKnobStep;
             _pickup_above = s36 > _mix;
             PutStr(PutInt(val, static_cast<int>(_volume * 100.f + 0.5f)), " %");
@@ -211,9 +237,10 @@ void SporeUI::_ProcessModPads() {
     // the MPR121's auto-config sets each pad's charge current for a pad with a finger on
     // it, and the baselines learn the fingers. Recalibrating while held left P10/P11 not
     // responding afterwards (2026-11-08, most likely this).
-    // Volume mode (S36 moved during the hold): P10/P11 do nothing until it ends, and a
-    // pad still held then can't count as a tap
-    if (_vol_mode) {
+    // Volume or scale/root mode: P10/P11 do nothing until it ends, and a pad still held
+    // then can't count as a tap
+    _ProcessPickPads(t10, t11);
+    if (_vol_mode || _pick_mode) {
         _hold_10 = _hold_11 = 0;
         _both_used = t10 || t11;
         return;
@@ -277,6 +304,83 @@ void SporeUI::_ProcessModPads() {
     if (!t10 && !t11) _both_used = false;
 }
 
+// Scale and root gestures. They use the fixed firm threshold, so noise at the top of S37
+// can't make a pick.
+void SporeUI::_ProcessPickPads(bool t10, bool t11) {
+    auto& f = _touch.field();
+    uint8_t firm = 0;
+    for (uint8_t i = 0; i < kScalePads; i++) {
+        if (f.IsFirmTouched(kFirstScalePad + i)) firm |= 1u << i;
+    }
+    const uint8_t pressed = firm & ~_scale_firm;
+    _scale_firm = firm;
+    const bool root_down = f.IsFirmTouched(kRootPad);
+    const bool root_pressed = root_down && !_root_firm;
+    _root_firm = root_down;
+
+    const bool can_pick = _pick_mode
+        || (t10 && t11 && !_vol_mode && !_recal_armed && _recal_lock == 0);
+
+    if (pressed && can_pick) {
+        _pick_mode = true;
+        _pick_idle = 0;
+        uint8_t pick = 0;
+        while (!(pressed & (1u << pick))) pick++;
+        _scale_pick = pick;
+        _engine.SetScale(pick);
+        _Blink(pick + 1);
+        _screen.ShowControl("SCALE", kScales[pick].name);
+    }
+
+    if (root_pressed && can_pick) {
+        _pick_mode = true;
+        _pick_idle = 0;
+        _root_ticks = 1;
+    } else if (_root_ticks > 0) {
+        if (root_down) {
+            // Fires once, while still held
+            if (_root_ticks < kTapMaxTicks && ++_root_ticks == kTapMaxTicks) _PickRoot(0);
+        } else {
+            if (_root_ticks < kTapMaxTicks) _PickRoot((_root_pick + 1) % 12);
+            _root_ticks = 0;
+        }
+    }
+
+    if (!_pick_mode) return;
+    if (t10 || t11 || _root_ticks > 0) {
+        _pick_idle = 0;
+    } else if (++_pick_idle >= kPickWindowTicks) {
+        _pick_mode = false;
+        _save_pending = true;
+    }
+}
+
+void SporeUI::_PickRoot(uint8_t root) {
+    _root_pick = root;
+    _engine.PushTouch({ TouchEvent::Root, root, kRootPlinkVel, 0 });
+    _flash = kStrikeFlash;
+    char val[4];
+    PutNote(val, root, false);
+    _screen.ShowControl("ROOT", val);
+}
+
+void SporeUI::_MidiRoot(uint8_t root) {
+    _engine.SetRoot(root);
+    if (root != _root_pick) {
+        _root_pick = root;
+        _midi_save_wait = kMidiSaveTicks;
+    }
+}
+
+void SporeUI::_MidiScale(uint8_t scale) {
+    scale %= kScaleCount;
+    _engine.SetScale(scale);
+    if (scale != _scale_pick) {
+        _scale_pick = scale;
+        _midi_save_wait = kMidiSaveTicks;
+    }
+}
+
 // Intensity: how much is happening on the field. Rises fast, falls slowly.
 void SporeUI::_UpdateIntensity() {
     auto& f = _touch.field();
@@ -308,17 +412,17 @@ void SporeUI::_HandleMidi(MidiEvent& m) {
     switch (m.type) {
         case ControlChange: {
             auto cc = m.AsControlChange();
-            if (cc.control_number == kCcRoot)       _engine.SetRoot(cc.value % 12);
-            else if (cc.control_number == kCcScale) _engine.SetScale(cc.value);
+            if (cc.control_number == kCcRoot)       _MidiRoot(cc.value % 12);
+            else if (cc.control_number == kCcScale) _MidiScale(cc.value);
             else if (cc.control_number == 123)      _engine.AllNotesOff();
             break;
         }
         case ProgramChange:
-            _engine.SetScale(m.AsProgramChange().program);
+            _MidiScale(m.AsProgramChange().program);
             break;
         case NoteOn: {
             auto on = m.AsNoteOn();
-            if (m.channel == kRootNoteChannel && on.velocity > 0) _engine.SetRoot(on.note % 12);
+            if (m.channel == kRootNoteChannel && on.velocity > 0) _MidiRoot(on.note % 12);
             break;
         }
         default: break;
@@ -351,6 +455,11 @@ void SporeUI::_Led(DaisySeed& hw) {
     // Solid while P10/P11 is held: shows the touch is detected, before the tap registers
     // …and while an armed recalibration waits for both to be let go
     if (_hold_10 > 0 || _hold_11 > 0 || _recal_armed) { hw.SetLed(true); return; }
+    if (_saved_flicker > 0) {
+        _saved_flicker--;
+        hw.SetLed((_saved_flicker % kSavedFlickerPeriod) < kSavedFlickerPeriod / 2);
+        return;
+    }
     if (_blink_count > 0) {
         bool on = (_blink_tick % kBlinkTicks) < kBlinkTicks / 2;
         if (++_blink_tick >= kBlinkTicks * _blink_count) { _blink_count = 0; _blink_tick = 0; }

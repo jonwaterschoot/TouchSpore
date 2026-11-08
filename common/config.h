@@ -29,7 +29,7 @@ static constexpr int     kPlinkBaseMidi  = 12 * 5; // degree 0 of the plinks sit
 static constexpr int     kPadBaseMidi    = 12 * 3; // pad chords centre around D2..D3
 
 // Hidden volume (P10 + P11 + S36), after the soft clip. Fader position 0–1, gain = position².
-// Resets to this on every boot until settings storage exists (roadmap Phase 1).
+// Used until a volume has been saved (ui/spore_settings.h).
 static constexpr float   kDefaultVolume  = 0.6f;  // gain 0.36, −9 dB
 
 // Delay buffer (lives in SDRAM, allocated in TouchSpore.cpp)

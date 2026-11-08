@@ -32,8 +32,22 @@ Built on the TouchString project structure and its introduction of velocity emul
 | P11 tap | Toggle field → plinks (on by default) |
 | P10 + P11 hold 2.5 s, let go | Recalibrate. Do this after attaching/removing clips |
 | P10 + P11 hold, move S36 | Volume (default 60 %). See below |
+| P10 + P11 hold, touch P02–P09 | Scale. See below |
+| P10 + P11 hold, P00 | Tap: next root. Press 0.6 s: C. See below |
 
-**Volume** (P10 + P11 + S36): hold P10 and P11, then move S36 before the recalibrate bar fills. You can let go of the pads. S36 sets the volume until it rests for 2 seconds, then controls the mix again once it passes the old mix position. The volume resets to 60 % on every boot.
+**Volume** (P10 + P11 + S36): hold P10 and P11, then move S36 before the recalibrate bar fills. You can let go of the pads. S36 sets the volume until it rests for 2 seconds, then controls the mix again once it passes the old mix position.
+
+**Scale** (P10 + P11 + P02–P09): hold P10 and P11, then touch a pad firmly. The pad picks the scale and plays no note. The LED blinks once for P02, up to 8 times for P09.
+
+| Pad | P02 | P03 | P04 | P05 | P06 | P07 | P08 | P09 |
+|---|---|---|---|---|---|---|---|---|
+| Scale | natural minor | dorian | minor pent | phrygian | major | lydian | major pent | harmonic minor |
+
+**Root** (P10 + P11 + P00): each tap moves the root up one semitone, wrapping from B to C. Press for 0.6 s to jump to C. Each change plays the new root on a plink, so keep S36 away from the pads-only end if you have no screen.
+
+After a scale or root pick you can let go of P10 and P11 and keep picking until 2 seconds after the last pick.
+
+**Saved settings:** volume, scale and root are stored in the Daisy's QSPI flash and load at boot. They survive a firmware update. The gestures save when they end, and root or scale sent over MIDI save 5 seconds after the last change. The LED flickers for 0.5 s after a save. Pads and knobs pause for up to 0.3 s during a save, and audio keeps playing. The P10/P11 routing is not saved and returns to plinks only at every boot.
 
 **Per-note variation** (SW2 up): every plink samples three drunk walks (random walks) plus its own
 small jitter. These offset octave (−1/0/+1), tone (S34 ±0.5) and attack/decay (S35 ±0.65) around the
@@ -43,7 +57,8 @@ P10/P11 use the chip's own touch detection with a fixed threshold (as TouchStrin
 working when the field is hyper sensitive.
 LED: flash per detected touch (long = strike, short = flicker; autoplay notes don't flash);
 solid while P10/P11 is held; then 2 blinks = toggled on, 1 = off, 3 = recalibrated (smooth),
-4 = recalibrated (raw). LED flashes but no sound: check the left fader (pads ←→ plinks) and P11.
+4 = recalibrated (raw), fast flicker = settings saved. LED flashes but no sound: check the left fader (pads ←→ plinks), P11 and the
+saved volume (P10 + P11 + S36).
 
 **Freeze code.** If the controls stop responding, the LED blinks a code after ~1 s
 (N blinks, pause, repeat), driven from the audio callback:
@@ -56,7 +71,7 @@ solid while P10/P11 is held; then 2 blinks = toggled on, 1 = off, 3 = recalibrat
 | 4 | P10/P11 logic |
 | 5 | Intensity |
 | 6 | MIDI out |
-| 7 | The loop's delay (system tick not running) |
+| 7 | Screen redraw, settings save (QSPI flash) or the loop's delay (system tick not running) |
 | 8 | Not stuck: audio CPU overload starves the main loop |
 
 ## How the sensitivity fader works (`touch/field.cpp`)
@@ -142,7 +157,7 @@ git submodule add https://github.com/electro-smith/DaisySP.git lib/DaisySP
 git submodule update --init --recursive
 make libs -j8 && make -j8 && make program-dfu
 ```
-Flash: ~122 KB of 128 KB.
+Flash: ~125 KB of 128 KB.
 
 ### Release
 

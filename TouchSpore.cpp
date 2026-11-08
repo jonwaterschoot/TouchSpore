@@ -4,6 +4,7 @@
 #include "ui/spore_ui.h"
 #include "display/oled.h"
 #include "ui/spore_boot.h"
+#include "ui/spore_settings.h"
 
 const char* USBD_MANUFACTURER_STRING = "Synthux";
 const char* USBD_PRODUCT_STRING_HS   = "TouchSpore";
@@ -17,7 +18,8 @@ CpuLoadMeter cpu;
 Touch touch;
 spore::Engine engine;
 Oled oled;
-SporeUI ui(touch, engine, oled);
+SettingsStore settings(hw);
+SporeUI ui(touch, engine, oled, settings);
 
 // Ping-pong delay lines live in the 64 MB SDRAM
 static float DSY_SDRAM_BSS delay_l[spore::kDelayMaxSamples];
@@ -27,7 +29,7 @@ static float DSY_SDRAM_BSS delay_r[spore::kDelayMaxSamples];
 // controls freeze, so it watches SporeUI::Beat(). After ~1 s without a main-loop pass it
 // takes over the LED and blinks a code, then a 1.5 s pause, repeating:
 //   1–7 blinks = stuck in that SporeUI::Stage (1 MIDI in, 2 I2C: touch chip or OLED, 3 knobs & switches,
-//                4 P10/P11, 5 intensity, 6 MIDI out, 7 OLED redraw, LED and the wait for the next 4 ms tick)
+//                4 P10/P11, 5 intensity, 6 MIDI out, 7 OLED redraw, settings save, LED and the wait for the next 4 ms tick)
 //   8 blinks   = audio CPU overload: the main loop is starved, not stuck
 // Blocks are 1 ms (48 samples at 48 kHz), so the counters below are in ms.
 void Watchdog() {
@@ -56,6 +58,7 @@ int main(void) {
     hw.SetAudioBlockSize(48);
     hw.SetAudioSampleRate(SaiHandle::Config::SampleRate::SAI_48KHZ);
 
+    settings.Init();
     touch.Init(hw);
     // Screen on before the baseline learn, so the pads calibrate with the panel running
     // (its charge pump adds supply noise). No screen at 0x3C: nothing is sent, ever.
@@ -66,7 +69,9 @@ int main(void) {
         System::Delay(4);
     }
 
-    engine.Init(hw.AudioSampleRate(), delay_l, delay_r, spore::kDelayMaxSamples);
+    const Settings& saved = settings.Get();
+    engine.Init(hw.AudioSampleRate(), delay_l, delay_r, spore::kDelayMaxSamples,
+                saved.root, saved.scale, saved.volume * saved.volume);
     ui.Init(hw);
     cpu.Init(hw.AudioSampleRate(), hw.AudioBlockSize());
 

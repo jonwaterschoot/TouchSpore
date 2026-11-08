@@ -15,9 +15,9 @@ enum Target : uint8_t { kToPads = 1, kToPlinks = 2 };
 
 // Main loop → audio: something happened on the field
 struct TouchEvent {
-    enum Kind : uint8_t { Strike, Flicker };
+    enum Kind : uint8_t { Strike, Flicker, Root };   // Root: set the root now and play it on a plink
     Kind    kind;
-    uint8_t pad;
+    uint8_t pad;       // for Root: the new root, 0–11
     float   amount;    // velocity for strikes, fluctuation amount for flickers
     uint8_t targets;   // Target bitmask from P10/P11 routing
 };
@@ -33,7 +33,10 @@ struct NoteOut {
 // compiled and run on a computer (see tools/sim.cpp).
 class Engine {
 public:
-    void Init(float sample_rate, float* delay_l, float* delay_r, size_t delay_len);
+    // gain sets the output level directly, with no ramp from a default.
+    void Init(float sample_rate, float* delay_l, float* delay_r, size_t delay_len,
+              uint8_t root = kDefaultRoot, uint8_t scale = kDefaultScale,
+              float gain = kDefaultVolume * kDefaultVolume);
     void Process(const float* const* in, float** out, size_t size);
 
     // ---- called from the main loop ----

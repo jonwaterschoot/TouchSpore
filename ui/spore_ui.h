@@ -6,6 +6,7 @@
 #include "config.h"
 #include "oled.h"
 #include "spore_screen.h"
+#include "spore_settings.h"
 
 namespace synthux {
 
@@ -22,10 +23,15 @@ namespace synthux {
 //   P11 tap   toggle: field → plinks
 //   P10 + P11 hold ~2.5 s, then let go: recalibrate (do this after attaching crocodile clips)
 //   P10 + P11 held + S36 moved: S36 sets the volume until it rests 2 s (_ProcessFader)
+//   P10 + P11 held + firm touch on P02..P09: scale 0..7
+//   P10 + P11 held + P00: tap = next root, long press = C. Played on a plink.
+//     Both stay open until 2 s after the last pick with P10/P11 let go (_ProcessPickPads)
+//   Volume, scale and root save when their gesture ends. Root and scale sent over MIDI
+//   save ~5 s after the last change. Nothing else is saved.
 class SporeUI : public FieldListener {
 public:
-    SporeUI(Touch& touch, spore::Engine& engine, Oled& oled)
-        : _touch(touch), _engine(engine), _oled(oled), _screen(oled) {}
+    SporeUI(Touch& touch, spore::Engine& engine, Oled& oled, SettingsStore& settings)
+        : _touch(touch), _engine(engine), _oled(oled), _settings(settings), _screen(oled) {}
 
     void Init(daisy::DaisySeed& hw);
     void Process(daisy::DaisySeed& hw);     // ~250 Hz from the main loop
@@ -33,7 +39,7 @@ public:
     // Main-loop watchdog, read from the audio callback: Beat() advances every pass,
     // Stage() says which part of the pass is running (the blink code when it stalls).
     // kStageTouch covers all I2C: the MPR121 read and the OLED transfer. kStageIdle
-    // covers the screen redraw and the LED.
+    // covers the screen redraw, the settings save and the LED.
     enum Stage : uint8_t {
         kStageMidiIn = 1, kStageTouch, kStageControls, kStageModPads,
         kStageIntensity, kStageMidiOut, kStageIdle,
@@ -51,6 +57,10 @@ private:
     void _ShowKnob(int i, float v);
     void _ShowSwitch(bool autoplay, int pos);
     void _ProcessModPads();
+    void _ProcessPickPads(bool t10, bool t11);
+    void _PickRoot(uint8_t root);
+    void _MidiRoot(uint8_t root);
+    void _MidiScale(uint8_t scale);
     void _UpdateIntensity();
     void _ProcessMidi();
     void _HandleMidi(daisy::MidiEvent& m);
@@ -65,6 +75,7 @@ private:
     Touch&         _touch;
     spore::Engine& _engine;
     Oled&          _oled;
+    SettingsStore& _settings;
     SporeScreen    _screen;
 
     // Last value shown per knob (S30–S37). The first passes only follow the knobs:
@@ -83,6 +94,18 @@ private:
     uint16_t _vol_idle = 0;
     bool     _mix_pickup = false;
     bool     _pickup_above = false;   // fader was above the mix when the pickup started
+
+    // Scale and root gestures. _scale_pick and _root_pick also follow MIDI, and are what
+    // gets saved.
+    bool     _pick_mode = false;
+    uint16_t _pick_idle = 0;
+    uint8_t  _scale_firm = 0;         // firm-touch bits of P02..P09 on the last pass
+    bool     _root_firm = false;      // P00 firm-touched on the last pass
+    uint16_t _root_ticks = 0;         // passes of the current P00 press, 0 = no press
+    uint8_t  _scale_pick = spore::kDefaultScale;
+    uint8_t  _root_pick = spore::kDefaultRoot;
+    uint16_t _midi_save_wait = 0;     // passes until a root or scale sent over MIDI is saved
+    bool     _save_pending = false;   // set when a gesture ends, written in kStageIdle
 
 #ifdef USB_MIDI
     daisy::MidiUsbHandler  _midi_usb;
@@ -112,6 +135,7 @@ private:
     uint8_t  _flash = 0;
     uint8_t  _blink_count = 0;
     uint16_t _blink_tick = 0;
+    uint8_t  _saved_flicker = 0;   // passes left of the "settings saved" flicker
 };
 
 } // namespace synthux
