@@ -60,6 +60,12 @@ public:
     float    Pressure() const  { return _filter.Pressure(); }
     uint32_t NoteCount() const { return _note_count; }   // LED flash on change
 
+    // For the OLED. Written in the audio callback, read from the main loop (single bytes).
+    uint8_t Root() const        { return _tuning.Root(); }   // in effect, after SetRoot() lands on a step
+    uint8_t Scale() const       { return _tuning.Scale(); }
+    uint8_t ChordRoot() const   { return _chord_root; }      // pitch class in the scale, 0..size-1
+    uint8_t ChordTones() const  { return _chord_n; }         // 3, or 4 with a seventh
+
 private:
     void _Step();
     void _OnTouch(const TouchEvent& e);
@@ -111,6 +117,7 @@ private:
     uint32_t _steps_since_pad_touch = 1000;
     bool     _pads_on = false;
     uint32_t _note_count = 0;
+    volatile uint8_t _chord_root = 0, _chord_n = 3;
 };
 
 } // namespace spore

@@ -9,7 +9,7 @@ Neither of these sensors read actual biological signals. Both turn small drifts 
 
 Pads P00–P09 are read as a continuous capacitive field. The right fader sets their sensitivity. With the fader down they need a firm touch. With the fader up they react to a hand 1–2 cm away, and clipped wires or plants act as antennas. P10 and P11 are control pads and ignore the fader.
 
-Hold P10+P11 for 1.5 seconds to recalibrate.
+To recalibrate, hold P10+P11 for 2.5 seconds, then let go. It runs once both pads have been untouched for 0.3 seconds, so the chip measures the pads without fingers on them. P10 and P11 then ignore touches for 0.5 seconds.
 
 **How touches trigger the notes:** Each field pad plays one note of the scale (default D minor), and higher pads play higher notes. A firm touch (a strike) plays its note at once. Smaller fluctuations (flickers, upper half of the fader) and the autoplay generator suggest notes too, and these wait for the next sixteenth note of a 60 BPM grid. A density filter then picks which of them play. The busier the field, the fewer notes pass, and the ones that do move in small steps and land on chord tones on the beat. This can cause some actual touches to not fire a note immediatly.
 
@@ -30,7 +30,7 @@ Built on the TouchString project structure and its introduction of velocity emul
 | P00–P09 | The field: a strike plays its note at once; flickers and intensity feed the generator |
 | P10 tap | Toggle field → slow pads (a strike makes that pad the chord root, at once) |
 | P11 tap | Toggle field → plinks (on by default) |
-| P10 + P11 hold 1.5 s | Recalibrate. Do this after attaching/removing clips |
+| P10 + P11 hold 2.5 s, let go | Recalibrate. Do this after attaching/removing clips |
 
 **Per-note variation** (SW2 up): every plink samples three drunk walks (random walks) plus its own
 small jitter. These offset octave (−1/0/+1), tone (S34 ±0.5) and attack/decay (S35 ±0.65) around the

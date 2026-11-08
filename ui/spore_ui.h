@@ -4,6 +4,8 @@
 #include "touch.h"
 #include "engine.h"
 #include "config.h"
+#include "oled.h"
+#include "spore_screen.h"
 
 namespace synthux {
 
@@ -18,16 +20,19 @@ namespace synthux {
 //   P00..P09  the field (notes, flickers, intensity)
 //   P10 tap   toggle: field → slow pads (touch picks the next chord root)
 //   P11 tap   toggle: field → plinks
-//   P10 + P11 hold ~1.5 s: recalibrate (do this after attaching crocodile clips)
+//   P10 + P11 hold ~2.5 s, then let go: recalibrate (do this after attaching crocodile clips)
 class SporeUI : public FieldListener {
 public:
-    SporeUI(Touch& touch, spore::Engine& engine) : _touch(touch), _engine(engine) {}
+    SporeUI(Touch& touch, spore::Engine& engine, Oled& oled)
+        : _touch(touch), _engine(engine), _oled(oled), _screen(oled) {}
 
     void Init(daisy::DaisySeed& hw);
     void Process(daisy::DaisySeed& hw);     // ~250 Hz from the main loop
 
     // Main-loop watchdog, read from the audio callback: Beat() advances every pass,
     // Stage() says which part of the pass is running (the blink code when it stalls).
+    // kStageTouch covers all I2C: the MPR121 read and the OLED transfer. kStageIdle
+    // covers the screen redraw and the LED.
     enum Stage : uint8_t {
         kStageMidiIn = 1, kStageTouch, kStageControls, kStageModPads,
         kStageIntensity, kStageMidiOut, kStageIdle,
@@ -42,6 +47,8 @@ public:
 
 private:
     void _ProcessControls();
+    void _ShowKnob(int i, float v);
+    void _ShowSwitch(bool autoplay, int pos);
     void _ProcessModPads();
     void _UpdateIntensity();
     void _ProcessMidi();
@@ -56,6 +63,14 @@ private:
 
     Touch&         _touch;
     spore::Engine& _engine;
+    Oled&          _oled;
+    SporeScreen    _screen;
+
+    // Last value shown per knob (S30–S37). The first passes only follow the knobs:
+    // AnalogControl's smoothing starts at 0, and that ramp is not a change.
+    float    _shown[8] = {};
+    uint8_t  _settle = 50;
+    int      _sw_a = -1, _sw_b = -1;
 
 #ifdef USB_MIDI
     daisy::MidiUsbHandler  _midi_usb;
@@ -69,7 +84,9 @@ private:
     bool     _to_plinks = true;
     uint16_t _hold_10 = 0, _hold_11 = 0;
     bool     _both_used = false;
-    bool     _recal_latched = false;
+    bool     _recal_armed = false; // held 2.5 s: recalibrates once both pads are let go
+    uint16_t _recal_wait = 0;      // passes with both let go still to wait
+    uint16_t _recal_lock = 0;      // passes left before P10/P11 count again after a recalibration
 
     // Intensity
     float _recent = 0.f;

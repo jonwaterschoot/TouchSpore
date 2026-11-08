@@ -2,6 +2,7 @@
 #include "touch/touch.h"
 #include "engine/engine.h"
 #include "ui/spore_ui.h"
+#include "display/oled.h"
 
 const char* USBD_MANUFACTURER_STRING = "Synthux";
 const char* USBD_PRODUCT_STRING_HS   = "TouchSpore";
@@ -14,7 +15,8 @@ DaisySeed hw;
 CpuLoadMeter cpu;
 Touch touch;
 spore::Engine engine;
-SporeUI ui(touch, engine);
+Oled oled;
+SporeUI ui(touch, engine, oled);
 
 // Ping-pong delay lines live in the 64 MB SDRAM
 static float DSY_SDRAM_BSS delay_l[spore::kDelayMaxSamples];
@@ -23,8 +25,8 @@ static float DSY_SDRAM_BSS delay_r[spore::kDelayMaxSamples];
 // Main-loop watchdog. The audio callback is the one thing that keeps running when the
 // controls freeze, so it watches SporeUI::Beat(). After ~1 s without a main-loop pass it
 // takes over the LED and blinks a code, then a 1.5 s pause, repeating:
-//   1–7 blinks = stuck in that SporeUI::Stage (1 MIDI in, 2 touch chip/I2C, 3 knobs & switches,
-//                4 P10/P11, 5 intensity, 6 MIDI out, 7 LED and the wait for the next 4 ms tick)
+//   1–7 blinks = stuck in that SporeUI::Stage (1 MIDI in, 2 I2C: touch chip or OLED, 3 knobs & switches,
+//                4 P10/P11, 5 intensity, 6 MIDI out, 7 OLED redraw, LED and the wait for the next 4 ms tick)
 //   8 blinks   = audio CPU overload: the main loop is starved, not stuck
 // Blocks are 1 ms (48 samples at 48 kHz), so the counters below are in ms.
 void Watchdog() {
@@ -54,6 +56,12 @@ int main(void) {
     hw.SetAudioSampleRate(SaiHandle::Config::SampleRate::SAI_48KHZ);
 
     touch.Init(hw);
+    // Screen on before the baseline learn, so the pads calibrate with the panel running
+    // (its charge pump adds supply noise). No screen at 0x3C: nothing is sent, ever.
+    if (oled.Init(touch.field().Bus())) {
+        oled.Text((Oled::kWidth - 10 * Oled::kCharW) / 2, 12, "TOUCHSPORE");
+        oled.Flush();
+    }
     // Let Field learn baselines and noise floors (~0.5 s) before anything can trigger
     for (int i = 0; i < 140; i++) {
         touch.Process();

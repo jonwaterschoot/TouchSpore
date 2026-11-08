@@ -261,6 +261,8 @@ void Engine::_VoicePads(bool jump) {
     const int size = _tuning.Size();
     int tones[4];
     uint8_t n = _harmony.Tones(tones, size);
+    _chord_root = static_cast<uint8_t>(tones[0]);
+    _chord_n = n;
 
     // Centres per voice: bass root around degree `size` (D3), upper voices above it
     static constexpr int kLo[kPadVoices] = { 0, 1, 1, 1 };

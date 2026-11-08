@@ -48,7 +48,7 @@ Measured 2026-11-08 (`make DEBUG=1`, serial log every 2 s):
 
 Everything planned here runs in the main loop, and the audio callback gets no new work.
 
-Main-loop timing does change, and several timings count loop passes (tap < 150 passes, recalibrate 360 passes, ~250 Hz):
+Main-loop timing does change, and several timings count loop passes (tap < 150 passes, recalibrate 625 passes, ~250 Hz):
 
 - **OLED.** One 128-byte page takes ~3.3 ms of bus time at 400 kHz, and a blocking transfer stretches with the audio load (the audio interrupt preempts it). With passes up to 2.7 ms, a full page per pass overruns the 4 ms period. Plan: send the OLED by I2C DMA right after the touch read, so the transfer runs while the rest of the pass and the wait run, in 64-column half pages (~1.7 ms). The touch read waits for a transfer still in flight. The dirty-page driver only sends what changed. 20 frames/s max.
 - **Settings save.** `PersistentStorage::Save()` erases a 4 KB QSPI sector (45 ms typical, 300 ms max) and blocks the main loop for that time. Audio keeps running (code runs from internal flash), but pads and knobs pause. Save 5 s after the last change, never on every change.

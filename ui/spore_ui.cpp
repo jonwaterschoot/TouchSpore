@@ -8,11 +8,18 @@ using namespace daisysp;
 
 namespace {
 constexpr uint16_t kTapMaxTicks   = 150;   // < 0.6 s counts as a tap
-constexpr uint16_t kRecalTicks    = 360;   // ~1.5 s both pads held
+constexpr uint16_t kRecalTicks    = 625;   // ~2.5 s both pads held arms a recalibration
+constexpr uint16_t kRecalWaitTicks = 75;   // ~0.3 s with both let go before it runs
+constexpr uint16_t kRecalLockTicks = 125;  // ~0.5 s after it: P10/P11 ignored (Field relearns baselines)
 constexpr uint16_t kBlinkTicks    = 50;    // 200 ms per blink (100 on, 100 off), distinct from touch flashes
 constexpr uint8_t  kStrikeFlash   = 12;    // ~50 ms LED flash per detected strike
 constexpr uint8_t  kFlickerFlash  = 2;     // ~8 ms per flicker
 constexpr int      kMidiPerLoop   = 4;     // UART TX blocks ~1 ms per message: cap the main-loop stall
+constexpr float    kKnobStep      = 0.01f; // a knob counts as moved (and shows on the OLED) past 1 %
+
+const char* const kKnobLabels[8] = {
+    "REVERB", "DELAY", "CHORUS", "PAD BLEND", "TONE", "ATTACK/DECAY", "MIX", "SENSE",
+};
 }
 
 void SporeUI::Init(DaisySeed& hw) {
@@ -38,12 +45,18 @@ void SporeUI::Init(DaisySeed& hw) {
 void SporeUI::Process(DaisySeed& hw) {
     _beat = _beat + 1;
     _stage = kStageMidiIn;     _ProcessMidi();
-    _stage = kStageTouch;      _touch.Process();   // reads the MPR121, fires OnStrike/OnFlicker
+    _stage = kStageTouch;
+    _oled.WaitIdle();                              // the touch read needs the bus
+    _touch.Process();                              // reads the MPR121, fires OnStrike/OnFlicker
+    _oled.Service();                               // starts at most one half page by DMA
     _stage = kStageControls;   _ProcessControls();
     _stage = kStageModPads;    _ProcessModPads();
     _stage = kStageIntensity;  _UpdateIntensity();
     _stage = kStageMidiOut;    _SendNotes();
-    _stage = kStageIdle;       _Led(hw);
+    _stage = kStageIdle;
+    _screen.SetHarmony(_engine.Root(), _engine.Scale(), _engine.ChordRoot(), _engine.ChordTones());
+    _screen.Draw();
+    _Led(hw);
 }
 
 // Field → engine ...............................................................
@@ -65,20 +78,71 @@ void SporeUI::OnFlicker(uint8_t pad, float amount) {
 
 void SporeUI::_ProcessControls() {
     auto& k = _touch.knobs();
-    _engine.SetReverb(k.s30().Process());
-    _engine.SetDelay(k.s31().Process());
-    _engine.SetChorus(k.s32().Process());
-    _engine.SetPadBlend(k.s33().Process());
-    _engine.SetPlinkTone(k.s34().Process());
-    _engine.SetPlinkShape(k.s35().Process());
-    _engine.SetMix(k.s36().Process());
-    _touch.field().SetSensitivity(k.s37().Process());
+    const float v[8] = {
+        k.s30().Process(), k.s31().Process(), k.s32().Process(), k.s33().Process(),
+        k.s34().Process(), k.s35().Process(), k.s36().Process(), k.s37().Process(),
+    };
+    _engine.SetReverb(v[0]);
+    _engine.SetDelay(v[1]);
+    _engine.SetChorus(v[2]);
+    _engine.SetPadBlend(v[3]);
+    _engine.SetPlinkTone(v[4]);
+    _engine.SetPlinkShape(v[5]);
+    _engine.SetMix(v[6]);
+    _touch.field().SetSensitivity(v[7]);
 
     auto a = _touch.switches().A();
     _engine.SetAutoMode(a == Switch3::POS_DOWN ? Generator::Mode::Off : Generator::Mode::On);
     _engine.SetAutoMod(a == Switch3::POS_UP);
     auto b = _touch.switches().B();
     _engine.SetCeiling(b == Switch3::POS_UP ? 3 : b == Switch3::POS_CENTER ? 2 : 1);
+
+    // OLED: the last control that moved
+    if (_settle > 0) {
+        _settle--;
+        for (int i = 0; i < 8; i++) _shown[i] = v[i];
+        _sw_a = a; _sw_b = b;
+        return;
+    }
+    for (int i = 0; i < 8; i++) {
+        if (fabsf(v[i] - _shown[i]) > kKnobStep) { _shown[i] = v[i]; _ShowKnob(i, v[i]); }
+    }
+    if (a != _sw_a) { _sw_a = a; _ShowSwitch(true, a); }
+    if (b != _sw_b) { _sw_b = b; _ShowSwitch(false, b); }
+}
+
+void SporeUI::_ShowKnob(int i, float v) {
+    char val[22];
+    char* p = val;
+    const int pct = static_cast<int>(v * 100.f + 0.5f);
+    if (i == 4) {
+        // Zones as in Engine's ToneFor(): glass blends into wood up to 0.45, drive above 0.55
+        p = PutStr(p, v < 0.2f ? "glass " : v < 0.55f ? "wood " : "drive ");
+    }
+    if (i == 6) {   // 0 = pads only, 1 = plinks only
+        p = PutStr(p, "PD ");
+        p = PutInt(p, 100 - pct);
+        p = PutStr(p, " : PL ");
+        PutInt(p, pct);
+    } else {
+        p = PutInt(p, pct);
+        p = PutStr(p, " %");
+        // Flickers fade in over the top of the fader (Field::_UpdateDerived)
+        if (i == 7 && v > 0.45f) PutStr(p, " flicker");
+    }
+    _screen.ShowControl(kKnobLabels[i], val);
+}
+
+void SporeUI::_ShowSwitch(bool autoplay, int pos) {
+    if (autoplay) {
+        _screen.ShowControl("AUTOPLAY", pos == Switch3::POS_DOWN ? "off" : pos == Switch3::POS_CENTER ? "on" : "on + vary");
+        return;
+    }
+    // Same octave as Engine's ceiling: degree 0 of the plinks plus 1–3 octaves
+    const int oct = pos == Switch3::POS_UP ? 3 : pos == Switch3::POS_CENTER ? 2 : 1;
+    char val[8];
+    PutNote(val, kPlinkBaseMidi + _engine.Root() + 12 * oct, true);
+    _screen.ShowControl("HIGHEST NOTE", val);
 }
 
 // P10 / P11 use the fixed "firm" threshold, so they stay reliable whatever the fader says.
@@ -87,29 +151,66 @@ void SporeUI::_ProcessModPads() {
     const bool t10 = f.IsFirmTouched(kPadSynthPad);
     const bool t11 = f.IsFirmTouched(kPlinkPad);
 
+    // The recalibration runs only once both pads are let go. With fingers on the board,
+    // the MPR121's auto-config sets each pad's charge current for a pad with a finger on
+    // it, and the baselines learn the fingers. Recalibrating while held left P10/P11 not
+    // responding afterwards (2026-11-08, most likely this).
+    if (_recal_armed) {
+        if (t10 || t11) { _recal_wait = kRecalWaitTicks; return; }
+        if (--_recal_wait > 0) return;
+        _recal_armed = false;
+        f.Recalibrate();   // picks Smooth/Raw profile from the fader position
+        const bool raw = f.CurrentProfile() == Field::Profile::Raw;
+        _Blink(raw ? 4 : 3);
+        _screen.ShowControl("RECALIBRATED", raw ? "raw" : "smooth");
+        _recal_lock = kRecalLockTicks;
+        return;
+    }
+    // Field ignores strikes while it relearns. Keep P10/P11 quiet for as long, so the
+    // "RECALIBRATED" line stays up and a stray touch can't toggle routing.
+    if (_recal_lock > 0) {
+        if (t10 || t11) _recal_lock = kRecalLockTicks;
+        else            _recal_lock--;
+        return;
+    }
+
     if (t10 && t11) {
         _both_used = true;
-        if (++_hold_10 > kRecalTicks && !_recal_latched) {
-            _recal_latched = true;
-            f.Recalibrate();   // picks Smooth/Raw profile from the fader position
-            _Blink(f.CurrentProfile() == Field::Profile::Raw ? 4 : 3);
+        if (++_hold_10 > kRecalTicks) {
+            _recal_armed = true;
+            _recal_wait = kRecalWaitTicks;
+            _hold_10 = _hold_11 = 0;
+            _both_used = false;
+            _screen.ShowControl("RECALIBRATE", "let go");
+            return;
         }
+        _screen.ShowProgress("RECAL", static_cast<float>(_hold_10) / kRecalTicks);
         _hold_11 = _hold_10;
         return;
     }
 
+    _screen.ShowProgress("", -1.f);   // a hold let go before 2.5 s: back to the control line
+
     // Toggle on release of a short tap
     if (!t10 && _hold_10 > 0) {
-        if (!_both_used && _hold_10 < kTapMaxTicks) { _to_pads = !_to_pads; _Blink(_to_pads ? 2 : 1); }
+        if (!_both_used && _hold_10 < kTapMaxTicks) {
+            _to_pads = !_to_pads;
+            _Blink(_to_pads ? 2 : 1);
+            _screen.ShowControl("FIELD -> PADS", _to_pads ? "on" : "off");
+        }
         _hold_10 = 0;
     }
     if (!t11 && _hold_11 > 0) {
-        if (!_both_used && _hold_11 < kTapMaxTicks) { _to_plinks = !_to_plinks; _Blink(_to_plinks ? 2 : 1); }
+        if (!_both_used && _hold_11 < kTapMaxTicks) {
+            _to_plinks = !_to_plinks;
+            _Blink(_to_plinks ? 2 : 1);
+            _screen.ShowControl("FIELD -> PLINKS", _to_plinks ? "on" : "off");
+        }
         _hold_11 = 0;
     }
     if (t10) _hold_10++;
     if (t11) _hold_11++;
-    if (!t10 && !t11) { _both_used = false; _recal_latched = false; }
+    if (!t10 && !t11) _both_used = false;
 }
 
 // Intensity: how much is happening on the field. Rises fast, falls slowly.
@@ -164,6 +265,7 @@ void SporeUI::_SendNotes() {
     NoteOut n;
     int budget = kMidiPerLoop;
     while (budget-- > 0 && _engine.PopNoteOut(n)) {
+        _screen.OnNote(n);
         uint8_t msg[3] = {
             static_cast<uint8_t>((n.velocity ? 0x90 : 0x80) | (n.channel & 0x0F)),
             static_cast<uint8_t>(n.note & 0x7F),
@@ -183,7 +285,8 @@ void SporeUI::_SendNotes() {
 
 void SporeUI::_Led(DaisySeed& hw) {
     // Solid while P10/P11 is held: shows the touch is detected, before the tap registers
-    if (_hold_10 > 0 || _hold_11 > 0) { hw.SetLed(true); return; }
+    // …and while an armed recalibration waits for both to be let go
+    if (_hold_10 > 0 || _hold_11 > 0 || _recal_armed) { hw.SetLed(true); return; }
     if (_blink_count > 0) {
         bool on = (_blink_tick % kBlinkTicks) < kBlinkTicks / 2;
         if (++_blink_tick >= kBlinkTicks * _blink_count) { _blink_count = 0; _blink_tick = 0; }

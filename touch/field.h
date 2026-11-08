@@ -57,6 +57,9 @@ public:
 
     Profile CurrentProfile() const { return _profile; }
 
+    // I2C1, shared with the OLED (display/oled.h). Configured here at 400 kHz.
+    daisy::I2CHandle& Bus() { return _i2c; }
+
 #if DEBUG
     // For the serial log in TouchSpore.cpp: how often _Configure() ran, why, and the
     // last ECR value the health check read back.
