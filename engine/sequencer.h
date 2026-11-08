@@ -33,7 +33,7 @@ struct NoteChoice {
 };
 
 // ---------------------------------------------------------------------------------
-// MelodyFilter — keeps dense trigger streams melodically interesting.
+// MelodyFilter: turns dense trigger streams into melodic lines.
 //
 // "Pressure" (0..1) follows the recent density of candidates. As it rises:
 //  1. Rhythm thins:   only metrically stronger sixteenths let notes through, and a
@@ -46,10 +46,10 @@ struct NoteChoice {
 //  4. No stutter:     the same note never repeats more than twice (once when dense).
 //  5. Harmony:        on beats, notes snap to the current pad chord's tones.
 //  6. Motifs:         short interval patterns are recorded while it's calm and replayed
-//                     (transposed to the current note) while it's busy — dense input turns
-//                     into recognisable sequences instead of random spray.
-// Modes (left switch): Free = no rules, only a voice budget; Melodic; Strict = always
-// behaves as if the field is busy.
+//                     (transposed to the current note) while it's busy, so dense input
+//                     plays recognisable sequences.
+// Modes: Free = no rules, only a voice budget; Melodic; Strict = always behaves as if
+// the field is busy. The firmware fixes Melodic; Free and Strict are used by tools/sim.cpp.
 // ---------------------------------------------------------------------------------
 class MelodyFilter {
 public:
@@ -88,7 +88,7 @@ private:
 };
 
 // ---------------------------------------------------------------------------------
-// Harmony — slow chord progression for the pads (Markov walk over scale degrees).
+// Harmony: slow chord progression for the pads (Markov walk over scale degrees).
 // ---------------------------------------------------------------------------------
 class Harmony {
 public:
@@ -105,7 +105,7 @@ private:
 };
 
 // ---------------------------------------------------------------------------------
-// Generator — the always-running algorithm. A random walk with "gravity" towards the
+// Generator: the always-running algorithm. A random walk with "gravity" towards the
 // last touched pad and towards chord tones; density and register follow intensity.
 // ---------------------------------------------------------------------------------
 class Generator {

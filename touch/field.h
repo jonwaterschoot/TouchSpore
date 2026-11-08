@@ -26,8 +26,8 @@ public:
 //  • Reads the 13th "proximity" electrode (all 12 pads combined = the whole
 //    board as one antenna) as an "aura" level for presence.
 //  • At high sensitivity, fluctuation of each electrode (normalised to its own
-//    noise floor) fires Flicker events — the Pocket-Scion-style "the plant is
-//    playing" behaviour, which also works with crocodile clips/wires on the pads.
+//    noise floor) fires Flicker events (the Pocket-Scion-style "the plant is
+//    playing" behaviour). This also works with crocodile clips/wires on the pads.
 //  • Two AFE profiles: Smooth (heavy filtering, stable touch) and Raw (light
 //    filtering, lets the fluctuations through). Chosen at Recalibrate() from the
 //    current sensitivity, so they never glitch mid-performance.

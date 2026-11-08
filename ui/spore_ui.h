@@ -18,7 +18,7 @@ namespace synthux {
 //   P00..P09  the field (notes, flickers, intensity)
 //   P10 tap   toggle: field → slow pads (touch picks the next chord root)
 //   P11 tap   toggle: field → plinks
-//   P10 + P11 hold ~0.5 s: recalibrate (do this after attaching crocodile clips)
+//   P10 + P11 hold ~1.5 s: recalibrate (do this after attaching crocodile clips)
 class SporeUI : public FieldListener {
 public:
     SporeUI(Touch& touch, spore::Engine& engine) : _touch(touch), _engine(engine) {}

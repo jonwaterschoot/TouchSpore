@@ -1,26 +1,40 @@
 # TouchSpore
 
-Generative plinks-and-pads firmware for the Synthux Simple Touch, inspired by the Pocket SCÍON.
-The touch pads are read as a continuous capacitive *field*: the right fader moves it from
-"needs a real touch" to "reacts to presence — and wires on the pads become antennas".
-Sketch, built on the TouchString project structure. Compiles; not yet tested on hardware.
+Generative plinks-and-pads firmware for the Synthux Simple Touch, inspired by devices like the Pocket SCÍON and Playtronica's Biotron, TouchMe and Playtron or the Spoke Board project.
+
+The Pocket SCÍON wires a plant into a 555 timer circuit and reads micro-fluctuations in its galvanic resistance. One wire sends a signal into the plant, the plant acts as a resistor, and a second wire reads the signal back.
+The Simple Touch's MPR121 measures each pad's capacitance to ground.
+
+Neither of these sensors read actual biological signals. Both turn small drifts from plants, skin and the room into a source of randomness, and TouchSpore uses that drift to trigger notes on the Simple Touch.
+
+Pads P00–P09 are read as a continuous capacitive field. The right fader sets their sensitivity. With the fader down they need a firm touch. With the fader up they react to a hand 1–2 cm away, and clipped wires or plants act as antennas. P10 and P11 are control pads and ignore the fader.
+
+Hold P10+P11 for 1.5 seconds to recalibrate.
+
+**How touches trigger the notes:** Each field pad plays one note of the scale (default D minor), and higher pads play higher notes. A firm touch (a strike) plays its note at once. Smaller fluctuations (flickers, upper half of the fader) and the autoplay generator suggest notes too, and these wait for the next sixteenth note of a 60 BPM grid. A density filter then picks which of them play. The busier the field, the fewer notes pass, and the ones that do move in small steps and land on chord tones on the beat. This can cause some actual touches to not fire a note immediatly.
+
+Built on the TouchString project structure and its introduction of velocity emulation.
 
 ## Controls
 
 | Control | Function |
 |---|---|
-| S30 / S31 / S32 | Reverb / Delay (ping-pong, dotted 8th) / Chorus — each knob = amount + size |
+| S30 / S31 / S32 | Reverb / Delay (ping-pong, dotted 8th) / Chorus. Each knob sets amount + size |
 | S33 | Pads: strings ←→ choir |
 | S34 | Plinks tone: glass (FM bell) → wood (marimba, around 50 %) → saturated (per-voice drive, darker as it rises) |
-| S35 | Plinks: attack & decay together — snappy pluck ←→ soft swelling bowl |
+| S35 | Plinks attack & decay together: snappy pluck ←→ soft swelling bowl |
 | S36 left fader | Pads ←→ plinks, centre = 50/50 (equal power) |
 | S37 right fader | Field sensitivity |
-| Right switch (SW2) | Down = touch only · centre = autoplay · up = autoplay + per-note variation: every plink samples and holds three drunk walks (random walks) plus a little jitter of its own: octave −1/0/+1, tone (S34 ±0.5) and attack/decay (S35 ±0.65) around the knobs, so one note rings long, the next is short, some jump an octave |
+| Right switch (SW2) | Down = touch only · centre = autoplay · up = autoplay + per-note variation (see below) |
 | Left switch (SW1) | Highest plink note: up = D7, centre = D6, down = D5 (at root D); higher notes fold down by octaves |
 | P00–P09 | The field: a strike plays its note at once; flickers and intensity feed the generator |
 | P10 tap | Toggle field → slow pads (a strike makes that pad the chord root, at once) |
 | P11 tap | Toggle field → plinks (on by default) |
-| P10 + P11 hold 0.5 s | Recalibrate — do this after attaching/removing clips |
+| P10 + P11 hold 1.5 s | Recalibrate. Do this after attaching/removing clips |
+
+**Per-note variation** (SW2 up): every plink samples three drunk walks (random walks) plus its own
+small jitter. These offset octave (−1/0/+1), tone (S34 ±0.5) and attack/decay (S35 ±0.65) around the
+knob positions. One note rings long, the next is short, and some jump an octave.
 
 P10/P11 use the chip's own touch detection with a fixed threshold (as TouchString), so they keep
 working when the field is hyper sensitive.
@@ -49,14 +63,17 @@ filtered data for all 12 pads plus the MPR121's 13th "proximity" electrode (all 
 the whole board as one antenna) and does everything in software, so it can change live:
 
 - **Threshold**: 40 counts (firm touch) → ~1 count (presence), but never below each pad's own
-  measured noise × a factor that drops *below 1* at the top of the fader — there, noise itself plays.
-- **Baseline tracking** slows as sensitivity rises, so a hovering hand isn't learned away.
+  measured noise × a factor that drops *below 1* at the top of the fader. There, noise itself plays.
+- **Baseline tracking** slows as sensitivity rises. The baseline is each pad's "untouched" reading,
+  and it slowly follows drift. Slowing it down stops a hand that hovers near a pad from becoming the
+  new "untouched" level.
 - **Flickers** (top half of the fader): fluctuation of each pad, normalised to its own noise floor,
-  fires events — the SCÍON idea. Plants, wires, mains hum all count.
+  fires events (the SCÍON idea). Plants, wires and mains hum all count.
 - **Aura**: the proximity electrode adds to intensity once the field is sensitive.
-- **AFE profile** is chosen at recalibration: *Smooth* (heavy filtering) below 70 % on the fader,
+- **AFE profile** (AFE = analog front end, the part of the MPR121 that charges each pad and
+  measures it, before any digital processing) is chosen at recalibration: *Smooth* (heavy filtering) below 70 % on the fader,
   *Raw* (light filtering, more variance) above. Recalibrating also re-runs the MPR121 auto-config,
-  which adapts charge current/time to whatever is clipped on — that's what makes clips work.
+  which adapts charge current/time to whatever is clipped on. This is what makes clips work.
 
 All curves are in `Field::_UpdateDerived()`; they are first guesses to tune on the board.
 
@@ -68,9 +85,18 @@ intensity raises density and register. The pads follow
 a slow Markov chord progression in the scale (every 2 bars), voice-led, with a high shimmer voice
 that opens with intensity.
 
+**Chord progression** (`Harmony::Next()`): every 2 bars the pads move to a new chord. Each chord has
+a short list of chords that usually sound good after it, and the next one is picked at random from
+that list. Only the current chord counts (that is what "Markov" means), so the progression never
+loops but still sounds familiar. About 30 % of chords get a seventh. Each pad voice moves to the
+nearest note of the new chord (voice-led). A strike routed to the pads (P10) sets the chord root at
+once and pauses the progression for 2 bars.
+
 **Density filter** (`MelodyFilter`, fixed on Melodic; Free/Strict remain in the engine and `tools/sim.cpp`): pressure follows recent trigger density. As it rises, only
-stronger metric positions pass (down to an eighth-note grid) and a token bucket caps notes/s;
-swallowed triggers become accent on the next note. Leaps shrink (5 → 2 scale steps) so rising
+stronger metric positions pass (down to an eighth-note grid) and a token bucket caps notes/s.
+The token bucket is a note budget. The budget refills at a steady rate, each note that plays spends
+one unit, and when it's empty extra notes are dropped until it refills. Dropped triggers become
+accent on the next note. Leaps shrink (5 → 2 scale steps) so rising
 intensity becomes a climbing line; leaps are followed by a step back; no note repeats more than twice;
 beats snap to chord tones; calm phrases are recorded as motifs and replayed while it's busy.
 
@@ -82,8 +108,7 @@ semitones; Melodic plays ~2 notes/s, max leap 5 semitones, across 2½ octaves.
 
 ## MIDI (USB; TRS on USART1 with the TRS mod: RX D14, TX D13)
 
-TRS MIDI is off by default: build with `make UART_MIDI=1` only if your board has the TRS MIDI
-mod. On a stock Simple Touch D14 floats, and the noise on it made libDaisy's UART error handling
+TRS MIDI is off by default: it was causing errors, if you modded your Simple Touch with trs, build with `make UART_MIDI=1`. On a stock Simple Touch D14 floats, and the noise on it made libDaisy's UART error handling
 starve the main loop (all controls froze while audio kept playing, freeze code 1).
 
 In: CC 20 = root (0–11, C–B), CC 21 or Program Change = scale, Note On on ch 16 = root, CC 123 = all off.

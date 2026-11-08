@@ -30,7 +30,7 @@ struct NoteOut {
 };
 
 // Platform-independent engine (only depends on DaisySP) so it can also be
-// compiled and run on a computer — see tools/sim.cpp.
+// compiled and run on a computer (see tools/sim.cpp).
 class Engine {
 public:
     void Init(float sample_rate, float* delay_l, float* delay_r, size_t delay_len);

@@ -8,7 +8,7 @@ using namespace daisysp;
 
 namespace {
 constexpr uint16_t kTapMaxTicks   = 150;   // < 0.6 s counts as a tap
-constexpr uint16_t kRecalTicks    = 120;   // ~0.5 s both pads held
+constexpr uint16_t kRecalTicks    = 360;   // ~1.5 s both pads held
 constexpr uint16_t kBlinkTicks    = 50;    // 200 ms per blink (100 on, 100 off), distinct from touch flashes
 constexpr uint8_t  kStrikeFlash   = 12;    // ~50 ms LED flash per detected strike
 constexpr uint8_t  kFlickerFlash  = 2;     // ~8 ms per flicker

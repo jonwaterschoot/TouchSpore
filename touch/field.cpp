@@ -88,7 +88,7 @@ void Field::_Configure(Profile p) {
         _WriteRegister(0x7B, 0x0B);
     }
     // Auto-config targets for 3.3 V (AN3889). Auto-config also adapts the charge
-    // current/time to whatever is attached — which is what makes crocodile clips work.
+    // current/time to whatever is attached. This is what makes crocodile clips work.
     _WriteRegister(0x7D, 200);    // USL
     _WriteRegister(0x7E, 130);    // LSL
     _WriteRegister(0x7F, 180);    // TL
@@ -111,7 +111,7 @@ void Field::SetSensitivity(float s) {
     _UpdateDerived();
 }
 
-// The whole right-fader behaviour lives here. Curves are first guesses — tune on hardware.
+// The whole right-fader behaviour lives here. Curves are first guesses. Tune them on hardware.
 void Field::_UpdateDerived() {
     const float s = _sens;
     // Activation threshold: 40 counts (firm press; a full press is ~300+) → ~1 count (presence / noise level)

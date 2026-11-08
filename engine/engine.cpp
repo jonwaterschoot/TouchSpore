@@ -45,7 +45,7 @@ void Engine::Init(float sr, float* delay_l, float* delay_r, size_t delay_len) {
 // Audio callback ...............................................................
 
 void Engine::Process(const float* const* in, float** out, size_t size) {
-    (void)in;   // stereo input unused for now — could become a third, "listening" source
+    (void)in;   // stereo input unused for now. Could become a third, "listening" source.
 
     const float mix = _mix;
     const float g_plink = sinf(mix * 1.5707963f);   // equal power: centre = both at -3 dB

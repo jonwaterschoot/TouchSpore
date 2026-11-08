@@ -16,9 +16,9 @@ inline float Wrap(float ph) { return ph - static_cast<float>(static_cast<int>(ph
 
 // Plink ......................................................................
 // Two sounds, blended by the tone knob, then an optional saturator:
-//   A "glass" — soft 2-op FM bell (modulator at 3.5× gives the inharmonic shimmer)
-//   B "wood"  — marimba-ish: fundamental + fast-decaying 4th partial
-//   Drive     — per-voice soft saturation (chords stay clean: no intermodulation between
+//   A "glass": soft 2-op FM bell (modulator at 3.5× gives the inharmonic shimmer)
+//   B "wood":  marimba-ish: fundamental + fast-decaying 4th partial
+//   Drive:     per-voice soft saturation (chords stay clean: no intermodulation between
 //               notes) followed by a one-pole low-pass that closes as drive rises.
 // One knob (shape) moves attack and decay together: snappy pluck → soft swelling bowl.
 struct PlinkTone {
@@ -96,8 +96,8 @@ private:
 // Pad ........................................................................
 // Long, slow voice that moves between chord tones without re-triggering.
 // Pitch changes are instant (no glide), so it is always in tune; only the amplitude swells.
-//   A "strings" — three detuned PolyBLEP saws through a slowly breathing low-pass
-//   B "choir"   — sine + octave + soft twelfth, with gentle vibrato
+//   A "strings": three detuned PolyBLEP saws through a slowly breathing low-pass
+//   B "choir":   sine + octave + soft twelfth, with gentle vibrato
 class PadVoice {
 public:
     void Init(float sr, float lfo_rate) {

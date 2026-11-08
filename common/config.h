@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-// TouchSpore — global constants ...........................................
+// TouchSpore: global constants ...........................................
 namespace spore {
 
 // Clock: 60 BPM, sixteenth-note grid
