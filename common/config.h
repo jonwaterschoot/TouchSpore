@@ -17,6 +17,9 @@ static constexpr uint8_t kPadVoices      = 4;     // 3 chord tones + 1 shimmer v
 
 // Pads
 static constexpr uint8_t kFieldPads      = 10;    // P00..P09: sensing "field" pads → notes
+static constexpr uint8_t kFirstNotePad   = 3;     // P03 plays note 0. P00..P02 continue above P09
+constexpr uint8_t PadToNote(uint8_t pad)   { return (pad + kFieldPads - kFirstNotePad) % kFieldPads; }
+constexpr uint8_t NoteToPad(uint8_t note)  { return (note + kFirstNotePad) % kFieldPads; }
 static constexpr uint8_t kPadSynthPad    = 10;    // P10: route field to the slow pad synth
 static constexpr uint8_t kPlinkPad       = 11;    // P11: route field to the plinks
 static constexpr uint8_t kElectrodes     = 13;    // 12 pads + MPR121 proximity electrode (whole board)

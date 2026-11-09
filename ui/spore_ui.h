@@ -18,7 +18,7 @@ namespace synthux {
 //   Right switch: up = autoplay + per-note random octave, tone (S34) and length (S35),
 //                 centre = autoplay, down = touch only
 //   Left switch:  highest plink note   up = D7, centre = D6, down = D5 (at root D; higher notes fold down)
-//   P00..P09  the field (notes, flickers, intensity)
+//   P00..P09  the field (notes, flickers, intensity). Notes run P03..P09, then P00..P02
 //   P10 tap   toggle: field → slow pads (touch picks the next chord root)
 //   P11 tap   toggle: field → plinks
 //   P10 + P11 hold ~2.5 s, then let go: recalibrate (do this after attaching crocodile clips)

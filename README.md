@@ -11,7 +11,7 @@ Pads P00–P09 are read as a continuous capacitive field. The right fader sets t
 
 To recalibrate, hold P10+P11 for 2.5 seconds, then let go. It runs once both pads have been untouched for 0.3 seconds, so the chip measures the pads without fingers on them. P10 and P11 then ignore touches for 0.5 seconds.
 
-**How touches trigger the notes:** Each field pad plays one note of the scale (default D minor), and higher pads play higher notes. A firm touch (a strike) plays its note at once. Smaller fluctuations (flickers, upper half of the fader) and the autoplay generator suggest notes too, and these wait for the next sixteenth note of a 60 BPM grid. A density filter then picks which of them play. The busier the field, the fewer notes pass, and the ones that do move in small steps and land on chord tones on the beat. This can cause some actual touches to not fire a note immediatly.
+**How touches trigger the notes:** Each field pad plays one note of the scale (default D minor). P03–P09 play upward from the root, and P00–P02 continue above P09. A firm touch (a strike) plays its note at once. Smaller fluctuations (flickers, upper half of the fader) and the autoplay generator suggest notes too, and these wait for the next sixteenth note of a 60 BPM grid. A density filter then picks which of them play. The busier the field, the fewer notes pass, and the ones that do move in small steps and land on chord tones on the beat. This can cause some actual touches to not fire a note immediatly.
 
 Built on the TouchString project structure and its introduction of velocity emulation.
 
