@@ -21,6 +21,7 @@ namespace synthux {
 //   P00..P09  the field (notes, flickers, intensity). Notes run P03..P09, then P00..P02
 //   P10 tap   toggle: field → slow pads (touch picks the next chord root)
 //   P11 tap   toggle: field → plinks
+//   P10 + P11 tap together (< 0.6 s): toggle drift mode (random notes weighted by pad readings)
 //   P10 + P11 hold ~2.5 s, then let go: recalibrate (do this after attaching crocodile clips)
 //   P10 + P11 held + S36 moved: S36 sets the volume until it rests 2 s (_ProcessFader)
 //   P10 + P11 held + firm touch on P02..P09: scale 0..7
@@ -53,6 +54,7 @@ public:
     void OnRelease(uint8_t pad) override {}
 
 private:
+    bool _FieldMuted();                     // a scale or root pick is being made
     void _ProcessControls();
     void _ShowKnob(int i, float v);
     void _ShowSwitch(bool autoplay, int pos);
@@ -140,6 +142,7 @@ private:
     bool     _to_plinks = true;
     uint16_t _hold_10 = 0, _hold_11 = 0;
     bool     _both_used = false;
+    bool     _both_tap = false;    // a fresh two-pad press that can still end as the drift toggle
     bool     _recal_armed = false; // held 2.5 s: recalibrates once both pads are let go
     uint16_t _recal_wait = 0;      // passes with both let go still to wait
     uint16_t _recal_lock = 0;      // passes left before P10/P11 count again after a recalibration

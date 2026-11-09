@@ -23,6 +23,7 @@ Built with the Daisy Toolchain against the pinned libDaisy (text + data of the r
 | + `Setup()` / `Loop()` split | 126,876 B | 4,196 B |
 | + page touches and OLED frames | 127,364 B | 3,708 B |
 | + pad hits for the web manual | 127,892 B | 3,180 B |
+| + pad order, drift mode | 128,500 B | 2,572 B |
 
 The OLED added 12,440 B, more than the 5,096 B estimated from TouchVink's blocking driver. About 7 KB of it is libDaisy's interrupt-driven I2C HAL, which any I2C DMA transfer links in full (slave modes included). Font_6x8 is 1.5 KB, our driver and screen about 2.5 KB.
 
