@@ -122,10 +122,11 @@ void Engine::_OnTouch(const TouchEvent& e) {
     }
 
     const int size = _tuning.Size();
-    const int pc = e.pad % size;
+    const int note = PadToNote(e.pad);
+    const int pc = note % size;
     const float intensity = _intensity;
-    // Higher pads, harder strikes and higher overall intensity reach higher octaves
-    const int octave = e.pad / size + (intensity > 0.45f ? 1 : 0) + (intensity > 0.8f ? 1 : 0)
+    // Later notes in the pad order, harder strikes and higher overall intensity reach higher octaves
+    const int octave = note / size + (intensity > 0.45f ? 1 : 0) + (intensity > 0.8f ? 1 : 0)
                      + ((e.kind == TouchEvent::Strike && e.amount > 0.75f) ? 1 : 0);
 
     if (e.kind == TouchEvent::Flicker) {

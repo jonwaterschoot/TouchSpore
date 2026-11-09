@@ -516,15 +516,15 @@ void SporeUI::_Hit(uint8_t pad, float level) {
     if (v > _hits[pad]) _hits[pad] = v;
 }
 
-// A generated note has no pad. It lights the pad that plays its pitch: P00.. follow the
-// scale, and where two pads share a pitch class (pad % size), notes an octave up take the higher.
+// A generated note has no pad. It lights the pad that plays its pitch: P03.. follow the
+// scale, and where two pads share a pitch class, notes an octave up take the higher note.
 void SporeUI::_HitNote(uint8_t note, uint8_t velocity) {
     const ScaleDef& sc = kScales[_engine.Scale()];
     const int rel = note - kPlinkBaseMidi - _engine.Root();
     const int semis = Tuning::Mod(rel, 12);
     for (int c = 0; c < sc.size; c++) {
         if (sc.steps[c] != semis) continue;
-        _Hit(static_cast<uint8_t>(rel >= 12 && c + sc.size < kFieldPads ? c + sc.size : c), velocity / 127.f);
+        _Hit(NoteToPad(rel >= 12 && c + sc.size < kFieldPads ? c + sc.size : c), velocity / 127.f);
         return;
     }
 }
