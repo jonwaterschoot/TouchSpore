@@ -2,3 +2,4 @@ build
 build-web
 *.bin
 .claude/settings.local.json
+!docs/vendor/libdaisy/*.bin

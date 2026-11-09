@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simple Touch</title>
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<!-- added to the home screen (iPhone: Share > Add to Home Screen) it opens without the browser's bars -->
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1a1918">
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="ui.css">
+<script src="core.js"></script>
+<script src="community.js"></script>
+<script src="play.js"></script>
+<script src="vendor/webdfu/dfu.js"></script>
+<script src="vendor/webdfu/dfuse.js"></script>
+<script src="flash.js"></script>
+</head>
+<body class="ui-dark">
+<!--
+  One firmware's manual as a page of its own, with Play when its label file approves a browser build.
+  The designer's Web app… exports this page as index.html, with the files it needs, for GitHub Pages.
+  Labels: simple-touch-labels.json at the root of the firmware's repository (so a newly approved build
+  shows without exporting again); on this computer, or when the repository can't be read, the copy beside
+  this page. Without a copy, ?repo=https://github.com/<owner>/<repo> picks the repository.
+-->
+<div class="wrap">
+  <header class="top">
+    <div class="intro">
+      <nav class="nav" id="nav"></nav>
+      <h1 id="title">Simple Touch</h1>
+      <p id="intro"></p>
+    </div>
+    <div class="export"><div class="btns"><button type="button" id="flashBtn" title="Checks a firmware .bin and flashes it over USB">Upload to device…</button></div></div>
+  </header>
+
+  <div class="bar">
+    <div class="grp"><span class="cap">Theme</span><div class="seg" id="themeSeg"></div><button type="button" id="themeMore" class="tight" hidden>Other themes</button></div>
+    <div class="grp"><span class="cap">Layout</span><div class="seg" id="layoutSeg"></div><div class="seg" id="arrangeSeg" title="Main and secondary next to each other or one above the other"></div></div>
+    <div class="grp" id="modeGrp" hidden><span class="cap">Mode</span><div class="seg" id="modeSeg"></div></div>
+  </div>
+
+  <section class="play" id="play" hidden></section>
+  <section class="notice" id="notice" hidden></section>
+  <div class="lib">
+    <figure id="fig"><p class="hint">Loading the panel drawing…</p></figure>
+    <div class="split" id="libSplit" title="Drag to resize the drawing · double-click to reset"><span></span></div>
+    <div class="side" id="side"></div>
+  </div>
+  <section class="md" id="notes" hidden></section>
+  <details class="readme" id="readme" hidden>
+    <summary><span class="cap">README</span> <span id="readmeName"></span></summary>
+    <div id="readmeBody"></div>
+  </details>
+
+  <footer class="foot">
+    <span id="from"></span> Made with <a href="https://jonwaterschoot.github.io/simple-touch-labels/" target="_blank">Simple Touch labels</a> (code under the MIT license) · Layout engine after Fabio Bartali's Simple Touch Manual Designer · Simple Touch panel drawing © Roey Tsemah (<a href="https://synthux.academy" target="_blank">Synthux Academy</a>), adapted via Fabio Bartali's <a href="https://bartali.nl/touch-fx-manual.html" target="_blank">Touch FX manual</a>.
+  </footer>
+</div>
+
+<script>
+const LIBRARY='https://jonwaterschoot.github.io/simple-touch-labels/';
+let doc=emptyDoc();
+const V={theme:'panel', layout:'phone', ref:'', refMode:'empty', focusId:null, mode:''};
+const UI={theme:'panel', libTheme:'panel', allThemes:false, arrange:'side', repo:'', from:''};
+const $=id=>document.getElementById(id);
+let ready=false;
+
+function seg(el, opts, isOn, pick){
+  el.innerHTML='';
+  for(const [v,l] of opts){ const b=document.createElement('button'); b.type='button'; b.textContent=l; b.setAttribute('aria-pressed',String(!!isOn(v))); b.onclick=()=>pick(v); el.append(b); }
+}
+function buildBars(){
+  // a creator's look: that one alone, with the others one click away
+  const lookOnly=doc.look && UI.theme==='creator' && !UI.allThemes;
+  $('themeMore').hidden=!lookOnly;
+  seg($('themeSeg'), lookOnly? [['creator','Creator']] : [...(doc.look? [['creator','Creator']] : []), ...THEME_NAMES], v=>v===(doc.look? UI.theme : UI.libTheme),
+    v=>{ UI.theme=v; if(v==='creator') UI.allThemes=false; else UI.libTheme=v; update(); });
+  seg($('layoutSeg'), [['phone','Phone'],['desktop','Desktop']], v=>V.layout===v, v=>{ V.layout=v; update(); });
+  seg($('arrangeSeg'), [['side','Side by side'],['stack','Stacked']], v=>UI.arrange===v, v=>{ UI.arrange=v; update(); });
+  // modes (doc.modes, core.js): all of them (the print set) or one; while playing, the lever picks
+  const ml=modeList(); $('modeGrp').hidden=!ml.length;
+  if(ml.length){ seg($('modeSeg'), [['','All modes'],...ml.map(m=>[m.pos,m.name])], v=>(curMode()?.pos||'')===v, v=>{ V.mode=v; update(); });
+    $('modeSeg').querySelectorAll('button').forEach((b,i)=>{ b.title= i? `${lab(SLOT[doc.modes.switch])} ${ml[i-1].pos}` : 'The labels for every mode, as printed'; b.disabled=Play.on; }); }
+  // only with a secondary view; while playing there is one drawing
+  $('arrangeSeg').hidden=!hasSecondary();
+  $('arrangeSeg').querySelectorAll('button').forEach(b=>b.disabled=Play.on||Play.stage);
+}
+/* the mode switch moved while playing (play.js): the labels on the drawing are drawn again there; the toolbar and table here */
+function onModeChange(){ buildBars(); const t=$('sideTable'); if(t){ t.innerHTML=tableHTML(false); Play.table(); } }
+/* The Creator theme: the label file's own colours, sizes, font and drawing (doc.look); the other themes are the library's */
+const LIB_DESIGN=cloneDesign(design), lookFonts=new Set();
+function syncLook(){
+  const L= UI.theme==='creator' && doc.look;
+  design= L? L.design : LIB_DESIGN; ownStyles=!!L;
+  V.theme= L? L.theme : UI.libTheme;
+  setLabelFont(L? L.font : 'Archivo'); applyDesign();
+  if(L && L.font!=='Archivo' && !lookFonts.has(L.font)){ lookFonts.add(L.font); ensureFontLoaded(L.font).then(()=>{ if(doc.look===L) update(); }); }
+}
+
+/* the label file: the repository's own, or the copy beside this page (first on this computer, so changes can be tried before they are pushed) */
+const LOCAL=/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+/* ?preview: the designer's current state in this browser, following its edits (its Web app… dialog opens this) */
+const PREVIEW=new URLSearchParams(location.search).has('preview');
+addEventListener('storage', async e=>{
+  if(!PREVIEW || e.key!==DESIGNER_KEY || !ready) return;
+  const p=await designerPreview(); if(!p) return;
+  if(JSON.stringify(p.doc.emulator)!==JSON.stringify(doc.emulator)) Play.reset();
+  doc=p.doc; UI.repo= REPO_RE.test(normRepo(doc.firmware.repo))? normRepo(doc.firmware.repo) : '';
+  setFaceplate(doc.faceplate, doc.faceplateRef); update();
+});
+async function loadDoc(){
+  if(PREVIEW){ const p=await designerPreview(); if(p) return {doc:p.doc, repo: REPO_RE.test(normRepo(p.doc.firmware.repo))? normRepo(p.doc.firmware.repo) : '', from:'preview'}; }
+  let copy=null; try{ const r=await fetch(LABEL_FILE,{cache:'no-cache'}); if(r.ok) copy=await r.text(); }catch(e){}
+  let repo='';
+  try{ repo=normRepo(JSON.parse(copy).firmware.repo); }catch(e){}
+  if(!copy) repo=normRepo(new URLSearchParams(location.search).get('repo')||'');
+  if(!REPO_RE.test(repo)) repo='';
+  const fromCopy=()=>copy && labelDocOf(copy, repo, path=>faceplateAt(path, path));
+  const fromRepo=async()=>{ const f=repo && await repoFile(repo, LABEL_FILE); return f && labelDocOf(f.text, repo, path=>repoFaceplate(repo, path)); };
+  let d=null, from='';
+  for(const [get,name] of LOCAL? [[fromCopy,'copy'],[fromRepo,'repo']] : [[fromRepo,'repo'],[fromCopy,'copy']]){ d=await get(); if(d){ from=name; break; } }
+  if(d && repo && !REPO_RE.test(d.firmware.repo||'')) d.firmware.repo=repo;
+  return {doc:d, repo, from};
+}
+
+function update(){
+  syncLook(); buildBars(); if(!ready) return;
+  document.body.className='ui-'+(design.themes[V.theme].ui||'dark');
+  for(let i=1;i<=MOD_MAX;i++) document.documentElement.style.setProperty('--m'+i, palOf('phone')['m'+i]);
+  // while playing or full screen, one drawing: the one the controls are on
+  const fw=doc.firmware, both=hasSecondary()&&!Play.on&&!Play.stage;
+  part='main'; bw=false;
+  const build=buildFor(V.layout), draw=pt=>svgOf(build(true,V.theme,pt));
+  const fig=$('fig'), stack=both&&UI.arrange==='stack'; fig.className= V.layout==='desktop'||(both&&!stack)? 'wide' : ''; sizeFig();
+  fig.innerHTML= both? `<div class="duo${stack?' stack':''}">${draw('main')}${draw('second')}</div>` : draw(part);
+  curPart=part;
+  Play.strip(); Play.attach(fig);
+  const repo=UI.repo, name=fw.name||'Simple Touch firmware';
+  document.title=name;
+  $('title').textContent=name;
+  $('flashBtn').onclick=()=>openFlash({name:fw.name||'', repo});
+  $('intro').textContent=[fw.description, fw.author&&'By '+fw.author+(fw.version?' · v'+fw.version:'')+'.'].filter(Boolean).join(' ')||'Firmware for the Synthux Simple Touch.';
+  $('nav').innerHTML=(repo? `<a href="${escAttr(repo)}" target="_blank">Repository ↗</a>` : '')+`<a href="${LIBRARY}" target="_blank">Simple Touch library ↗</a>`;
+  const src=[...(repo?[[repo,repoShort(repo)+' · source and firmware']]:[]), ['https://bartali.nl/touch-fx-manual.html','Panel drawing · by Roey Tsemah (Synthux Academy), via Fabio Bartali']];
+  $('side').innerHTML= `<div id="sideTable">${tableHTML(false)}</div>`+`<div class="sources"><span class="cap">Sources</span><div>${src.map(([h,t])=>`<a href="${escAttr(h)}" target="_blank">${esc(t)}</a>`).join('')}</div></div>`;
+  Play.table();
+  const notes=$('notes'); notes.hidden=!(fw.notes||'').trim(); notes.innerHTML=md2html(fw.notes);
+  readmeSection(repo);
+  $('from').textContent= {repo:`Labels from ${repoShort(repo)}/${LABEL_FILE}.`, copy:`Labels from the copy of ${LABEL_FILE} beside this page.`, preview:'Preview: the designer\'s current manual in this browser.'}[UI.from]||'';
+  if(UI.from==='preview'){ $('notice').hidden=false; $('notice').innerHTML=`<p><b>Preview of your web app.</b> Your manual from the <a href="editor.html">designer</a> in this browser, as the page in the .zip shows it once it is on GitHub Pages. It changes as you edit.</p>`; }
+  const url=new URL(location.href); url.searchParams.set('theme',UI.theme); url.searchParams.set('layout',V.layout); history.replaceState(null,'',url);
+}
+/* drag the divider between drawing and table to set the drawing's width (kept per layout); double-click resets */
+const figKey=()=>'stManualLib.figW.'+$('fig').className;
+function sizeFig(){ let w=0; try{ w=+localStorage.getItem(figKey())||0; }catch(e){} $('fig').style.width= w? `min(100%, ${w}px)` : ''; }
+$('libSplit').addEventListener('pointerdown',e=>{
+  e.preventDefault(); const f=$('fig'), x0=e.clientX, w0=f.getBoundingClientRect().width;
+  const move=ev=>{ const w=Math.round(Math.max(260,Math.min(1600,w0+ev.clientX-x0))); f.style.width=`min(100%, ${w}px)`; try{ localStorage.setItem(figKey(),String(w)); }catch(err){} };
+  const up=()=>{ removeEventListener('pointermove',move); removeEventListener('pointerup',up); };
+  addEventListener('pointermove',move); addEventListener('pointerup',up);
+});
+$('libSplit').addEventListener('dblclick',()=>{ try{ localStorage.removeItem(figKey()); }catch(e){} sizeFig(); });
+$('themeMore').onclick=()=>{ UI.allThemes=true; buildBars(); };
+
+(async()=>{
+  const q=new URLSearchParams(location.search);
+  const th=q.get('theme'); if(THEME_NAMES.some(t=>t[0]===th)) UI.theme=UI.libTheme=V.theme=th;
+  if(['phone','desktop'].includes(q.get('layout'))) V.layout=q.get('layout');
+  else if(matchMedia('(min-width: 1100px)').matches) V.layout='desktop';
+  buildBars();
+  try{ await loadPanelArt(); }catch(e){ $('fig').innerHTML='<p class="hint">The panel drawing could not be loaded. Open this page from a web server (GitHub Pages, or <code>python -m http.server</code> in its folder), not as a file.</p>'; return; }
+  const r=await loadDoc();
+  UI.repo=r.repo; UI.from=r.from;
+  if(r.doc){ doc=r.doc; if(doc.look && (!th || th==='creator')) UI.theme='creator'; }   // the creator's own look first
+  else { $('notice').hidden=false; $('notice').innerHTML=`<p><b>No labels found.</b> This page shows a firmware's <code>${LABEL_FILE}</code>: put it beside this page, or at the root of the repository this page is for${UI.repo? ` (<a href="${escAttr(UI.repo)}" target="_blank">${esc(repoShort(UI.repo))}</a>)` : ''}. <a href="${LIBRARY}about.html#step-5" target="_blank">How this works</a></p>`; V.ref='sx'; }
+  setFaceplate(doc.faceplate, doc.faceplateRef);
+  ready=true; onFontsLoaded=update;
+  update();
+  document.fonts.ready.then(update);
+})();
+</script>
+</body>
+</html>

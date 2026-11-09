@@ -2,6 +2,8 @@
 
 Generative plinks-and-pads firmware for the Synthux Simple Touch, inspired by devices like the Pocket SCÍON and Playtronica's Biotron, TouchMe and Playtron or the Spoke Board project.
 
+[Web app](https://jonwaterschoot.github.io/TouchSpore/): control manual, playable browser build, and firmware upload over USB (Chrome or Edge).
+
 The Pocket SCÍON wires a plant into a 555 timer circuit and reads micro-fluctuations in its galvanic resistance. One wire sends a signal into the plant, the plant acts as a resistor, and a second wire reads the signal back.
 The Simple Touch's MPR121 measures each pad's capacitance to ground.
 

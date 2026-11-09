@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Dark faceplate base -->
+  <rect x="2" y="2" width="60" height="60" fill="#1a1918" stroke="#201e1d" stroke-width="4"/>
+  <!-- Iconic Simple Touch slanted corner strip -->
+  <polygon points="32,4 60,4 60,24 42,24" fill="#e3bb67"/>
+  <!-- Red label chip with ST monogram -->
+  <rect x="6" y="10" width="38" height="24" fill="#ec3013"/>
+  <text x="25" y="28" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="18" fill="#ffffff" letter-spacing="0.5">ST</text>
+  <!-- Bottom touchpads & fingerprint arcs -->
+  <polygon points="6,39 23,38 24,58 6,58" fill="#f3f2f2"/>
+  <polygon points="27,38 41,39 41,58 26,58" fill="#f3f2f2"/>
+  <polygon points="44,39 58,38 58,58 44,58" fill="#f3f2f2"/>
+  <!-- Fingerprint / touch waves on center pad -->
+  <path d="M30 52 a4 5 0 0 1 7 0 M28.5 54 a6 7.5 0 0 1 10 0 M32 55 v-3" fill="none" stroke="#ec3013" stroke-width="1.8" stroke-linecap="round"/>
+</svg>
+
