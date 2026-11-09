@@ -38,9 +38,9 @@
   "modifiers": [],
   "combos": ["P10+P11"],
   "emulator": {
-    "wasm": "https://raw.githubusercontent.com/jonwaterschoot/TouchSpore/simple-touch-web/TouchSpore-8ad19b09a30c.wasm",
+    "wasm": "https://raw.githubusercontent.com/jonwaterschoot/TouchSpore/simple-touch-web/TouchSpore-98d142eaa94b.wasm",
     "abi": "simple-touch-web/1",
-    "sha256": "8ad19b09a30c91222a9ea02e2bfeda4fd08a0536411f89ced04324a28770172e",
+    "sha256": "98d142eaa94b93cb726c39ce3621f865fd5b08c36d0b6f7c246647270bbfb5a9",
     "embed": "allowed",
     "oled": true
   },
