@@ -21,6 +21,10 @@ Built on the TouchString project structure and its introduction of velocity emul
 
 ## Controls
 
+![TouchSpore: what each control does](docs/touchspore-controls.png)
+
+Control labels made with [Simple Touch labels](https://jonwaterschoot.github.io/simple-touch-labels/). To change them, open `simple-touch-labels.json` in the [designer](https://jonwaterschoot.github.io/simple-touch-labels/editor.html) (Open file…).
+
 | Control | Function |
 |---|---|
 | S30 / S31 / S32 | Reverb / Delay (ping-pong, dotted 8th) / Chorus. Each knob sets amount + size |
@@ -163,6 +167,15 @@ Out: plinks on ch 1, pad chords on ch 2. Over USB, CC 20 and CC 21 on ch 16 repo
 | OLED | `F0 7D 53 4F 01 <page> <column> <64 bytes, 7-bit packed> F7`. One changed half page per ~8 ms. Sent with or without a screen fitted |
 
 To touch a pad from a page, send `F0 7D 53 50 01 02 <force per pad, 12 bytes, 0 = up> F7`. It acts as a finger on the pad, including the P10/P11 gestures. Pads let go 2 s after the last frame, so repeat it while one is held.
+
+## Install
+
+Download the latest `.bin` from [Releases](https://github.com/jonwaterschoot/TouchSpore/releases/latest), and connect the Simple Touch with a USB **data** cable.
+
+1. Hold **BOOT** on the Daisy Seed, press and release **RESET**, then release **BOOT**.
+2. Open the [Daisy Web Programmer](https://flash.daisy.audio/), choose the `.bin` and flash it.
+
+From a terminal: `dfu-util -a 0 -s 0x08000000:leave -D touchspore-vX.Y.Z.bin -d ,0483:df11`
 
 ## Build
 

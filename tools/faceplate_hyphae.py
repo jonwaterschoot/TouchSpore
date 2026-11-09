@@ -3,7 +3,7 @@
 
     pip install pillow numpy
     python tools/faceplate_hyphae.py gif      [out.gif]   # default docs/faceplate_hyphae.gif
-    python tools/faceplate_hyphae.py avif     [out.avif]  # default docs/faceplate_hyphae.avif
+    python tools/faceplate_hyphae.py avif     [out.avif]  # default img/faceplate.avif, the file the manual reads
     python tools/faceplate_hyphae.py svg      [out.svg]   # default docs/faceplate_hyphae.svg (CSS animation, heavy to paint)
     python tools/faceplate_hyphae.py preview  [dir]       # four PNGs with the template's controls drawn in
 
@@ -370,7 +370,7 @@ def main():
         path = Path(target or ROOT / "docs" / "faceplate_hyphae.gif")
         write_gif(net, path)
     elif mode == "avif":
-        path = Path(target or ROOT / "docs" / "faceplate_hyphae.avif")
+        path = Path(target or ROOT / "img" / "faceplate.avif")
         write_avif(net, path)
     elif mode == "svg":
         path = Path(target or ROOT / "docs" / "faceplate_hyphae.svg")

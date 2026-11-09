@@ -10,33 +10,264 @@
     "authorUrl": "https://github.com/jonwaterschoot"
   },
   "labels": {
-    "S30": { "main": "Reverb", "main_2": "amount + size", "midi": "CC 22" },
-    "S31": { "main": "Delay", "main_2": "amount + size", "midi": "CC 23" },
-    "S32": { "main": "Chorus", "main_2": "amount + size", "midi": "CC 24" },
-    "S33": { "main": "Pad timbre", "main_2": "strings / choir", "midi": "CC 25" },
-    "S34": { "main": "Plink tone", "main_2": "glass / wood / drive", "midi": "CC 26" },
-    "S35": { "main": "Plink shape", "main_2": "pluck / bowl", "midi": "CC 27" },
-    "S36": { "main": "Pads / plinks", "main_2": "mix", "m_P10+P11": "Volume", "midi": "CC 28" },
-    "S37": { "main": "Sensitivity", "main_2": "firm / 1–2 cm", "midi": "CC 29" },
-    "S09_S10": { "main": "Top plink note", "main_2": "D5 / D6 / D7" },
-    "S07_S08": { "main": "Autoplay", "main_2": "vary / on / off" },
-    "P00": { "main": "Note 8", "m_P10+P11": "Root +1, hold: C", "midi": "CC 20 · ch 16 note" },
-    "P01": { "main": "Note 9" },
-    "P02": { "main": "Note 10", "m_P10+P11": "Natural minor", "midi": "CC 21 = 0 · PC 0" },
-    "P03": { "main": "Note 1", "m_P10+P11": "Dorian", "midi": "CC 21 = 1 · PC 1" },
-    "P04": { "main": "Note 2", "m_P10+P11": "Minor pent.", "midi": "CC 21 = 2 · PC 2" },
-    "P05": { "main": "Note 3", "m_P10+P11": "Phrygian", "midi": "CC 21 = 3 · PC 3" },
-    "P06": { "main": "Note 4", "m_P10+P11": "Major", "midi": "CC 21 = 4 · PC 4" },
-    "P07": { "main": "Note 5", "m_P10+P11": "Lydian", "midi": "CC 21 = 5 · PC 5" },
-    "P08": { "main": "Note 6", "m_P10+P11": "Major pent.", "midi": "CC 21 = 6 · PC 6" },
-    "P09": { "main": "Note 7", "m_P10+P11": "Harmonic minor", "midi": "CC 21 = 7 · PC 7" },
-    "P10": { "main": "Field to pads", "main_2": "tap on / off" },
-    "P11": { "main": "Field to plinks", "main_2": "tap on / off" },
-    "OUT": { "main": "Audio out" },
-    "LED": { "main": "Touch / status" }
+    "S30": {
+      "main": "Reverb",
+      "main_2": "amount + size",
+      "midi": "CC 22"
+    },
+    "S31": {
+      "main": "Delay",
+      "main_2": "amount + size",
+      "midi": "CC 23"
+    },
+    "S32": {
+      "main": "Chorus",
+      "main_2": "amount + size",
+      "midi": "CC 24"
+    },
+    "S33": {
+      "main": "Pad timbre",
+      "main_2": "strings / choir",
+      "midi": "CC 25"
+    },
+    "S34": {
+      "main": "Plink tone",
+      "main_2": "glass / wood / drive",
+      "midi": "CC 26"
+    },
+    "S35": {
+      "main": "Plink shape",
+      "main_2": "pluck / bowl",
+      "midi": "CC 27"
+    },
+    "S36": {
+      "main": "Pads / plinks",
+      "main_2": "mix",
+      "m_P10+P11": "Volume",
+      "midi": "CC 28"
+    },
+    "S37": {
+      "main": "Sensitivity",
+      "main_2": "firm / 1–2 cm",
+      "midi": "CC 29"
+    },
+    "S09_S10": {
+      "main": "Top plink note",
+      "main_2": "D5 / D6 / D7"
+    },
+    "S07_S08": {
+      "main": "Autoplay",
+      "main_2": "vary / on / off"
+    },
+    "P00": {
+      "main": "Note 8",
+      "m_P10+P11": "Root +1, hold: C",
+      "midi": "CC 20 · ch 16 note"
+    },
+    "P01": {
+      "main": "Note 9"
+    },
+    "P02": {
+      "main": "Note 10",
+      "m_P10+P11": "Natural minor",
+      "midi": "CC 21 = 0 · PC 0"
+    },
+    "P03": {
+      "main": "Note 1",
+      "m_P10+P11": "Dorian",
+      "midi": "CC 21 = 1 · PC 1"
+    },
+    "P04": {
+      "main": "Note 2",
+      "m_P10+P11": "Minor pent.",
+      "midi": "CC 21 = 2 · PC 2"
+    },
+    "P05": {
+      "main": "Note 3",
+      "m_P10+P11": "Phrygian",
+      "midi": "CC 21 = 3 · PC 3"
+    },
+    "P06": {
+      "main": "Note 4",
+      "m_P10+P11": "Major",
+      "midi": "CC 21 = 4 · PC 4"
+    },
+    "P07": {
+      "main": "Note 5",
+      "m_P10+P11": "Lydian",
+      "midi": "CC 21 = 5 · PC 5"
+    },
+    "P08": {
+      "main": "Note 6",
+      "m_P10+P11": "Major pent.",
+      "midi": "CC 21 = 6 · PC 6"
+    },
+    "P09": {
+      "main": "Note 7",
+      "m_P10+P11": "Harmonic minor",
+      "midi": "CC 21 = 7 · PC 7"
+    },
+    "P10": {
+      "main": "Field to pads",
+      "main_2": "tap on / off"
+    },
+    "P11": {
+      "main": "Field to plinks",
+      "main_2": "tap on / off"
+    },
+    "OUT": {
+      "main": "Audio out"
+    },
+    "LED": {
+      "main": "Touch / status"
+    },
+    "IN": {
+      "main": "-"
+    }
   },
   "modifiers": [],
-  "combos": ["P10+P11"],
+  "combos": [
+    "P10+P11"
+  ],
+  "faceplate": "img/faceplate.avif",
+  "fpStyle": {
+    "ratio": 0.6758448060075094
+  },
+  "customs": [
+    {
+      "id": 1794255958899,
+      "text": "TouchSpore",
+      "sub": "fields of touch",
+      "x": 370,
+      "y": 359,
+      "style": {
+        "size1": 51,
+        "size2": 40,
+        "text": "#d1c5ad4a",
+        "box": "#14141400",
+        "line": "#d9a44100"
+      }
+    }
+  ],
+  "offsets": {
+    "phone": {
+      "S31": {
+        "x": 10,
+        "y": -170
+      },
+      "OUT": {
+        "x": -63,
+        "y": 33,
+        "r": 270
+      },
+      "S34": {
+        "x": 55,
+        "y": -170
+      },
+      "LED": {
+        "x": 36,
+        "y": 48
+      },
+      "P11": {
+        "x": 193,
+        "y": -94
+      },
+      "P10": {
+        "x": -141,
+        "y": -99
+      },
+      "S33": {
+        "x": 40,
+        "y": -170
+      },
+      "S32": {
+        "x": 26,
+        "y": -170
+      },
+      "S35": {
+        "x": 1,
+        "y": -176
+      },
+      "S30": {
+        "x": -2,
+        "y": -178
+      },
+      "S07_S08": {
+        "x": 93,
+        "y": 2
+      },
+      "S09_S10": {
+        "x": -68,
+        "y": 35
+      },
+      "P05": {
+        "x": 5,
+        "y": 4
+      },
+      "P08": {
+        "x": -7,
+        "y": 30
+      },
+      "P06": {
+        "x": 9,
+        "y": 14
+      },
+      "P09": {
+        "x": 48,
+        "y": 24
+      },
+      "P04": {
+        "x": -5,
+        "y": 50
+      },
+      "P03": {
+        "x": -17,
+        "y": 4
+      },
+      "P07": {
+        "x": 7,
+        "y": -60
+      },
+      "P00": {
+        "x": -43,
+        "y": -23
+      },
+      "P01": {
+        "x": -21,
+        "y": -41
+      },
+      "P02": {
+        "x": 70,
+        "y": -32
+      },
+      "S37": {
+        "x": 72,
+        "y": 1,
+        "r": 90
+      },
+      "S36": {
+        "x": -70,
+        "y": 17,
+        "r": 270
+      },
+      "n:IN": {
+        "x": 2,
+        "y": -60
+      }
+    },
+    "desktop": {
+      "f:S37": {
+        "x": 36,
+        "y": -159,
+        "r": 90
+      },
+      "f:S36": {
+        "x": -35,
+        "y": -170,
+        "r": 270
+      }
+    }
+  },
   "emulator": {
     "wasm": "https://raw.githubusercontent.com/jonwaterschoot/TouchSpore/simple-touch-web/TouchSpore-98d142eaa94b.wasm",
     "abi": "simple-touch-web/1",
@@ -48,20 +279,458 @@
     "port": "TouchSpore",
     "request": "F0 7D 53 50 01 7E F7",
     "live": {
-      "knobs": { "state": "7D 53 50 01 01", "cc": 22 },
+      "knobs": {
+        "state": "7D 53 50 01 01",
+        "cc": 22
+      },
       "touch": "7D 53 50 01 02",
       "hits": "7D 53 50 01 03",
-      "oled": { "rows": 32 }
+      "oled": {
+        "rows": 32
+      }
     },
     "settings": [
       {
-        "id": "root", "label": "Root note", "widget": "buttons", "cc": 20, "channel": 16,
-        "options": ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+        "id": "root",
+        "label": "Root note",
+        "widget": "buttons",
+        "cc": 20,
+        "channel": 16,
+        "options": [
+          "C",
+          "C#",
+          "D",
+          "D#",
+          "E",
+          "F",
+          "F#",
+          "G",
+          "G#",
+          "A",
+          "A#",
+          "B"
+        ]
       },
       {
-        "id": "scale", "label": "Scale", "widget": "select", "cc": 21, "channel": 16,
-        "options": ["Natural minor", "Dorian", "Minor pentatonic", "Phrygian", "Major", "Lydian", "Major pentatonic", "Harmonic minor"]
+        "id": "scale",
+        "label": "Scale",
+        "widget": "select",
+        "cc": 21,
+        "channel": 16,
+        "options": [
+          "Natural minor",
+          "Dorian",
+          "Minor pentatonic",
+          "Phrygian",
+          "Major",
+          "Lydian",
+          "Major pentatonic",
+          "Harmonic minor"
+        ]
       }
     ]
+  },
+  "oled": {
+    "rows": 32,
+    "phone": {
+      "x": 343,
+      "y": 777,
+      "w": 403
+    },
+    "desktop": {
+      "x": 340,
+      "y": 767,
+      "w": 402
+    }
+  },
+  "fpLabels": {
+    "on": true,
+    "phone": {
+      "show": "off",
+      "size": 24
+    },
+    "desktop": {
+      "show": "with",
+      "size": 32
+    },
+    "text": {
+      "OUT": "-",
+      "LED": "-",
+      "P00": "-",
+      "P01": "-",
+      "P02": "-",
+      "P03": "-",
+      "P04": "-",
+      "P05": "-",
+      "P06": "-",
+      "P07": "-",
+      "P08": "-",
+      "P09": "-",
+      "P10": "-",
+      "P11": "-",
+      "S09_S10": "-",
+      "S07_S08": "-",
+      "IN": "-"
+    }
+  },
+  "design": {
+    "v": 2,
+    "size1": 34,
+    "size2": 25,
+    "size3": 26,
+    "padX": 14,
+    "padY": 8,
+    "radius": 8,
+    "gap": 14,
+    "weight": 500,
+    "modStyle": "outline",
+    "multiMod": "divided",
+    "boxOpacity": 0.54,
+    "leaderW": 2.5,
+    "fx": "shadow",
+    "fxColor": "#000000",
+    "fxSize": 5,
+    "caps": {
+      "phone": false,
+      "desktop": false
+    },
+    "names": {
+      "phone": {
+        "place": "drawing",
+        "size": null,
+        "x": 0,
+        "y": 0
+      },
+      "desktop": {
+        "place": "label",
+        "size": null,
+        "x": 0,
+        "y": 0
+      }
+    },
+    "fonts": {
+      "faceplate": {
+        "weight": 700
+      }
+    },
+    "themes": {
+      "light": {
+        "ui": "light",
+        "page": {
+          "bg": "#f3f2f2",
+          "fg": "#201e1d",
+          "muted": "#5b5856",
+          "rule": "#201e1d",
+          "hair": "rgba(32,30,29,.2)"
+        },
+        "phone": {
+          "mw": 2,
+          "ow": 0,
+          "box": "#ec3013",
+          "text": "#ffffff",
+          "line": "#ec3013",
+          "ref": "#ffd9d1",
+          "padBox": "#201e1d",
+          "padText": "#ffffff",
+          "m1": "#ffd23f",
+          "m2": "#7fd1ff",
+          "m3": "#b8f28b",
+          "m4": "#ff9ad5"
+        },
+        "desktop": {
+          "mw": 2,
+          "ow": 0,
+          "box": "#ec3013",
+          "text": "#ffffff",
+          "line": "#ec3013",
+          "ref": "#ffd9d1",
+          "padBox": "#201e1d",
+          "padText": "#ffffff",
+          "m1": "#ffd23f",
+          "m2": "#7fd1ff",
+          "m3": "#b8f28b",
+          "m4": "#ff9ad5"
+        },
+        "panel": {
+          "drawing": "simple",
+          "frame": "#f3f2f2",
+          "bg": "#bab6b6",
+          "border": "#201e1d",
+          "top": "#201e1d",
+          "strip": "#d7d3d3",
+          "pad": "#f8f4f4",
+          "padtop": "#f8f4f4",
+          "shape": "#201e1d",
+          "ctlline": "#f3f2f2",
+          "mid": "#7d7979",
+          "jack": "#9b9797",
+          "sw": "#ec3013",
+          "line": "#201e1d",
+          "led": "#ec3013",
+          "fp": "#f3f2f2",
+          "leader": "#7d7979",
+          "ink": "#201e1d"
+        }
+      },
+      "dark": {
+        "ui": "dark",
+        "page": {
+          "bg": "#1a1918",
+          "fg": "#f3f2f2",
+          "muted": "rgba(243,242,242,.7)",
+          "rule": "rgba(243,242,242,.4)",
+          "hair": "rgba(243,242,242,.15)"
+        },
+        "phone": {
+          "mw": 2,
+          "ow": 0,
+          "box": "#fd2b55",
+          "text": "#ffffff",
+          "line": "#26eae4",
+          "ref": "#ffd9d1",
+          "padBox": "#fd2b55",
+          "padText": "#ffffff",
+          "m1": "#26eae4",
+          "m2": "#ffe51d",
+          "m3": "#ffffff",
+          "m4": "#ff9ad5"
+        },
+        "desktop": {
+          "mw": 2,
+          "ow": 0,
+          "box": "#fd2b55",
+          "text": "#ffffff",
+          "line": "#26eae4",
+          "ref": "#ffd9d1",
+          "padBox": "#fd2b55",
+          "padText": "#ffffff",
+          "m1": "#26eae4",
+          "m2": "#ffe51d",
+          "m3": "#ffffff",
+          "m4": "#ff9ad5"
+        },
+        "panel": {
+          "drawing": "simple",
+          "frame": "#1a1918",
+          "bg": "#605d5d",
+          "border": "#9b9797",
+          "top": "#0b0a0a",
+          "strip": "#d7d3d3",
+          "pad": "#f8f4f4",
+          "padtop": "#f8f4f4",
+          "shape": "#201e1d",
+          "ctlline": "#f3f2f2",
+          "mid": "#7d7979",
+          "jack": "#9b9797",
+          "sw": "#ec3013",
+          "line": "#201e1d",
+          "led": "#ec3013",
+          "fp": "#f3f2f2",
+          "leader": "#9b9797",
+          "ink": "#f3f2f2"
+        }
+      },
+      "vis": {
+        "ui": "vis",
+        "page": {
+          "bg": "#141414",
+          "fg": "#f3f2f2",
+          "muted": "rgba(243,242,242,.7)",
+          "rule": "rgba(243,242,242,.4)",
+          "hair": "rgba(243,242,242,.15)"
+        },
+        "phone": {
+          "mw": 4.5,
+          "ow": 0,
+          "box": "#0a7d50",
+          "text": "#ffffff",
+          "line": "#0a7d50",
+          "ref": "#b9e6d2",
+          "padBox": "#2b2219",
+          "padText": "#e3bb67",
+          "m1": "#ffd23f",
+          "m2": "#ffffff",
+          "m3": "#00ffff",
+          "m4": "#ffffff"
+        },
+        "desktop": {
+          "mw": 2,
+          "ow": 0,
+          "box": "#0a7d50",
+          "text": "#ffffff",
+          "line": "#0a7d50",
+          "ref": "#b9e6d2",
+          "padBox": "#2b2219",
+          "padText": "#e3bb67",
+          "m1": "#ffd23f",
+          "m2": "#ffffff",
+          "m3": "#00ffff",
+          "m4": "#ffffff"
+        },
+        "panel": {
+          "drawing": "simple",
+          "round": 1,
+          "frame": "#141414",
+          "bg": "#4e4c4c",
+          "top": "#000000",
+          "strip": "#d9a441",
+          "pad": "#e3bb67",
+          "padtop": "#c9b48e",
+          "shape": "#4e4c4c",
+          "padw": 13,
+          "ctlline": "#ffffff",
+          "ctl": "#1c1c1c",
+          "ctlw": 6.5,
+          "mid": "#555555",
+          "jack": "#555555",
+          "sw": "#b3201c",
+          "line": "#ffffff",
+          "led": "#e08a3c",
+          "fp": "#d9a441",
+          "leader": "#ffe8bd",
+          "ink": "#f3f2f2"
+        }
+      },
+      "panel": {
+        "ui": "dark",
+        "page": {
+          "bg": "#222221",
+          "fg": "#f3f2f2",
+          "muted": "rgba(243,242,242,.7)",
+          "rule": "rgba(243,242,242,.4)",
+          "hair": "rgba(243,242,242,.15)"
+        },
+        "phone": {
+          "mw": 3,
+          "ow": 1,
+          "box": "#232323",
+          "text": "#d6d6d6",
+          "line": "#d6d6d6",
+          "ref": "#8f8d8b",
+          "m1": "#D63A24",
+          "m2": "#2F63D6",
+          "m3": "#6B7A1E",
+          "m4": "#E3A21A"
+        },
+        "desktop": {
+          "mw": 2,
+          "ow": 0,
+          "box": "#232323",
+          "text": "#d6d6d6",
+          "line": "#000000",
+          "ref": "#8f8d8b",
+          "m1": "#D63A24",
+          "m2": "#2F63D6",
+          "m3": "#6B7A1E",
+          "m4": "#E3A21A"
+        },
+        "panel": {
+          "bg": "#222221",
+          "line": "#ffffff",
+          "shape": "#060606",
+          "mid": "#666665",
+          "fp": "#ffffff",
+          "leader": "#ffffff",
+          "ink": "#ffffff",
+          "drawing": "synthux"
+        }
+      },
+      "gold": {
+        "ui": "gold",
+        "page": {
+          "bg": "#141414",
+          "fg": "#f3f2f2",
+          "muted": "rgba(243,242,242,.7)",
+          "rule": "rgba(243,242,242,.4)",
+          "hair": "rgba(243,242,242,.15)"
+        },
+        "phone": {
+          "mw": 1.5,
+          "ow": 1,
+          "box": "#141414",
+          "text": "#d1c5ad",
+          "line": "#d9a441",
+          "ref": "#d9a441",
+          "m1": "#D63A24",
+          "m2": "#2F63D6",
+          "m3": "#6B7A1E",
+          "m4": "#E3A21A"
+        },
+        "desktop": {
+          "mw": 2,
+          "ow": 0.5,
+          "box": "#141414",
+          "text": "#d1c5ad",
+          "line": "#d9a441",
+          "ref": "#d9a441",
+          "m1": "#D63A24",
+          "m2": "#2F63D6",
+          "m3": "#6B7A1E",
+          "m4": "#E3A21A"
+        },
+        "panel": {
+          "bg": "#141414",
+          "line": "#d9a441",
+          "shape": "#060606",
+          "mid": "#7a6236",
+          "fp": "#d9a441",
+          "leader": "#d9a441",
+          "ink": "#f3f2f2",
+          "sw": "#fd2b55"
+        }
+      },
+      "print": {
+        "ui": "light",
+        "page": {
+          "bg": "#ffffff",
+          "fg": "#1c1c1b",
+          "muted": "#5b5856",
+          "rule": "#1c1c1b",
+          "hair": "rgba(28,28,27,.2)"
+        },
+        "phone": {
+          "mw": 1.5,
+          "ow": 1,
+          "box": "#ffffff",
+          "text": "#1c1c1b",
+          "line": "#1c1c1b",
+          "ref": "#7d7979",
+          "m1": "#D63A24",
+          "m2": "#2F63D6",
+          "m3": "#6B7A1E",
+          "m4": "#E3A21A"
+        },
+        "desktop": {
+          "mw": 2,
+          "ow": 1,
+          "box": "#ffffff",
+          "text": "#1c1c1b",
+          "line": "#1c1c1b",
+          "ref": "#7d7979",
+          "m1": "#D63A24",
+          "m2": "#2F63D6",
+          "m3": "#6B7A1E",
+          "m4": "#E3A21A"
+        },
+        "panel": {
+          "bg": "#ffffff",
+          "line": "#1c1c1b",
+          "shape": "#1c1c1b",
+          "mid": "#8a8a87",
+          "fp": "#1c1c1b",
+          "leader": "#1c1c1b",
+          "ink": "#1c1c1b"
+        }
+      }
+    }
+  },
+  "font": {
+    "family": "Dosis",
+    "url": "https://fonts.googleapis.com/css2?family=Dosis:wght@400;500;600;700&display=swap"
+  },
+  "view": {
+    "theme": "gold",
+    "ref": "sx",
+    "refMode": "both"
   }
 }
