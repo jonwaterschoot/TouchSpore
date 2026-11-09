@@ -107,11 +107,15 @@ void SporeUI::Process(DaisySeed& hw) {
 
 // Field → engine ...............................................................
 
-void SporeUI::OnStrike(uint8_t pad, float velocity) {
-    // Picking a scale or root plays no field notes. The strike can land before or after
-    // the firm touch that makes the pick, so this also covers the passes with P10 + P11 held.
+// Picking a scale or root plays no field notes. The strike can land before or after
+// the firm touch that makes the pick, so this also covers the passes with P10 + P11 held.
+bool SporeUI::_FieldMuted() {
     auto& f = _touch.field();
-    if (_pick_mode || (f.IsFirmTouched(kPadSynthPad) && f.IsFirmTouched(kPlinkPad))) return;
+    return _pick_mode || (f.IsFirmTouched(kPadSynthPad) && f.IsFirmTouched(kPlinkPad));
+}
+
+void SporeUI::OnStrike(uint8_t pad, float velocity) {
+    if (_FieldMuted()) return;
 
     _recent =fminf(_recent + 0.12f + 0.25f * velocity, 1.5f);
     _flash = kStrikeFlash;
@@ -120,6 +124,9 @@ void SporeUI::OnStrike(uint8_t pad, float velocity) {
 }
 
 void SporeUI::OnFlicker(uint8_t pad, float amount) {
+    // In drift mode a pad touched to pick a scale or root would fire notes
+    if (_touch.field().Drift() && _FieldMuted()) return;
+
     _recent = fminf(_recent + 0.02f + 0.04f * amount, 1.5f);
     if (_flash < kFlickerFlash) _flash = kFlickerFlash;
     if (_Targets() & kToPlinks) _Hit(pad, 0.15f + 0.45f * amount);
@@ -243,7 +250,7 @@ void SporeUI::_ShowKnob(int i, float v) {
         p = PutInt(p, pct);
         p = PutStr(p, " %");
         // Flickers fade in over the top of the fader (Field::_UpdateDerived)
-        if (i == 7 && v > 0.45f) PutStr(p, " flicker");
+        if (i == 7 && v > 0.45f && !_touch.field().Drift()) PutStr(p, " flicker");
     }
     _screen.ShowControl(kKnobLabels[i], val);
 }
@@ -276,6 +283,7 @@ void SporeUI::_ProcessModPads() {
     if (_vol_mode || _pick_mode) {
         _hold_10 = _hold_11 = 0;
         _both_used = t10 || t11;
+        _both_tap = false;
         return;
     }
 
@@ -283,7 +291,7 @@ void SporeUI::_ProcessModPads() {
         if (t10 || t11) { _recal_wait = kRecalWaitTicks; return; }
         if (--_recal_wait > 0) return;
         _recal_armed = false;
-        f.Recalibrate();   // picks Smooth/Raw profile from the fader position
+        f.Recalibrate();   // picks Smooth/Raw profile from the fader position and mode
         const bool raw = f.CurrentProfile() == Field::Profile::Raw;
         _Blink(raw ? 4 : 3);
         _screen.ShowControl("RECALIBRATED", raw ? "raw" : "smooth");
@@ -299,12 +307,14 @@ void SporeUI::_ProcessModPads() {
     }
 
     if (t10 && t11) {
+        if (!_both_used) _both_tap = true;
         _both_used = true;
         if (++_hold_10 > kRecalTicks) {
             _recal_armed = true;
             _recal_wait = kRecalWaitTicks;
             _hold_10 = _hold_11 = 0;
             _both_used = false;
+            _both_tap = false;
             _screen.ShowControl("RECALIBRATE", "let go");
             return;
         }
@@ -314,6 +324,8 @@ void SporeUI::_ProcessModPads() {
     }
 
     _screen.ShowProgress("", -1.f);   // a hold let go before 2.5 s: back to the control line
+
+    const uint16_t held = _hold_10 > _hold_11 ? _hold_10 : _hold_11;
 
     // Toggle on release of a short tap
     if (!t10 && _hold_10 > 0) {
@@ -334,7 +346,16 @@ void SporeUI::_ProcessModPads() {
     }
     if (t10) _hold_10++;
     if (t11) _hold_11++;
-    if (!t10 && !t11) _both_used = false;
+    if (!t10 && !t11) {
+        if (_both_tap && held > 0 && held < kTapMaxTicks) {
+            const bool drift = !f.Drift();
+            f.SetDrift(drift);
+            _Blink(drift ? 2 : 1);
+            _screen.ShowControl("FIELD MODE", drift ? "drift" : "touch");
+        }
+        _both_tap = false;
+        _both_used = false;
+    }
 }
 
 // Scale and root gestures. They use the fixed firm threshold, so noise at the top of S37

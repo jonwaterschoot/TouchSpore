@@ -1,16 +1,21 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 (2026-11-09)
 
 ### Added
 
 - Added pad touches over USB MIDI: a web page can press pads as a finger would, including the P10/P11 gestures. Pads let go 2 s after the last message.
 - Added the OLED over USB MIDI while a page is connected, with or without a screen fitted.
 - Added pad hits over USB MIDI: plinks from strikes, flickers and autoplay light the pads on a connected page, by velocity. The pad chords don't.
+- Added drift mode: tap P10 + P11 together. P00–P09 fire notes at random, weighted by each pad's reading, and a held touch or clip keeps firing. Not saved. With S37 above 70 %, recalibrate after switching on.
 
 ### Changed
 
 - Changed the note order on the pads: P03–P09 play upward from the root, and P00–P02 continue above P09. The root and scale gestures stay on P00 and P02–P09.
+
+### Tested on hardware
+
+- Tested drift mode (2026-11-09): works as expected with the current values.
 
 ## 0.1.0 (2026-11-08)
 

@@ -21,6 +21,17 @@ constexpr uint16_t kFailPolls   = 25;      // ~0.1 s of failed reads → reset t
 constexpr uint8_t  kEcrRun      = 0xBC;    // CL = 10, ELEPROX_EN = 11 (ELE0..11 as electrode 13), 12 electrodes
 constexpr uint16_t kPressPolls  = 500;     // ~2 s: presses from the web manual end without a refresh
 
+// Drift mode (_ProcessDrift). Tried on the board 2026-11-09.
+constexpr float    kDriftSmooth   = 0.02f;    // ~200 ms average: resolves less than 1 count, so a far hand shows
+constexpr float    kDriftLeft     = 4.f;      // reading this × noise above the baseline: the hand or clip left
+constexpr float    kDriftHeld     = 1.f;      // average this × noise below the baseline: something is there
+constexpr float    kDriftHoldRate = 0.00003f; // ~130 s while something is there, so a held clip keeps playing
+constexpr float    kDriftSpan     = 0.2f;     // weight 1 at this fraction of _range (60 → 2.4 counts)
+constexpr float    kDriftGateMax  = 0.5f;     // noise cap for the gate (counts): a humming wire keeps its weight
+constexpr float    kDriftAura     = 0.1f;     // whole-board presence added to every pad's weight
+constexpr float    kDriftFire     = 0.024f;   // fire chance per poll at weight 1 (6 notes/s per pad)
+constexpr uint8_t  kDriftRefr     = 25;       // at least 100 ms between notes per pad
+
 inline float lerp(float a, float b, float t) { return a + (b - a) * t; }
 inline float lerp_exp(float a, float b, float t) { return a * powf(b / a, t); }
 inline float smoothstep(float e0, float e1, float x) {
@@ -110,8 +121,9 @@ void Field::_Configure(Profile p) {
     _settle = kSettlePolls;
 }
 
+// Drift mode reads a slow average, so it gains nothing from Raw and only gets its noise.
 void Field::Recalibrate() {
-    _Configure(_sens > 0.7f ? Profile::Raw : Profile::Smooth);
+    _Configure(_sens > 0.7f && !_drift ? Profile::Raw : Profile::Smooth);
 }
 
 void Field::SetSensitivity(float s) {
@@ -170,6 +182,33 @@ void Field::SetPress(uint8_t pad, float force) {
     _press_polls = kPressPolls;
 }
 
+// Runs in both modes, so the first notes after a switch have a settled baseline.
+// The pad's weight sets its fire chance, and a held touch keeps its weight, so it keeps
+// firing. MelodyFilter thins the result on the sixteenth grid.
+void Field::_ProcessDrift(Electrode& e, uint8_t pad, float f, float dev, float d, float noise) {
+    const float rate = (dev < -noise * kDriftLeft) ? kBaseUpRate
+                     : (e.drift_dev > noise * kDriftHeld) ? kDriftHoldRate
+                     : _base_rate;
+    e.drift_base += (f - e.drift_base) * rate;
+    e.drift_dev  += (dev - e.drift_dev) * kDriftSmooth;
+    e.drift_move += (d - e.drift_move) * kDriftSmooth;
+
+    // xorshift, with the reading mixed in. The XOR also recovers a zero state.
+    _dice ^= static_cast<uint32_t>(f);
+    _dice ^= _dice << 13; _dice ^= _dice >> 17; _dice ^= _dice << 5;
+
+    if (!_drift) return;
+    if (e.refr > 0) { e.refr--; return; }
+
+    const float span = _range * kDriftSpan;
+    const float w = fclamp((fmaxf(e.drift_dev, 0.f) + e.drift_move - fminf(noise, kDriftGateMax) * _noise_mul) / span
+                           + _aura * kDriftAura, 0.f, 1.f);
+    if ((_dice >> 8) * (1.f / 16777216.f) < w * kDriftFire) {
+        if (_listener) _listener->OnFlicker(pad, sqrtf(w));
+        e.refr = kDriftRefr;
+    }
+}
+
 void Field::Process() {
     if (_press_polls > 0 && --_press_polls == 0) for (auto& p : _press) p = 0.f;
     if (!_CheckChip()) return;
@@ -183,6 +222,8 @@ void Field::Process() {
 
     const bool settling = _settle > 0;
     if (settling) _settle--;
+
+    FieldListener* const touch_events = _drift ? nullptr : _listener;
 
     for (uint8_t i = 0; i < spore::kElectrodes; i++) {
         auto& e = _el[i];
@@ -202,6 +243,7 @@ void Field::Process() {
         if (settling) {
             e.base  += (f - e.base) * 0.05f;
             e.noise += (d - e.noise) * 0.05f;
+            e.drift_base = e.base;
             continue;
         }
         // A firm touch also freezes the baseline, so a held control pad isn't learned away
@@ -213,11 +255,13 @@ void Field::Process() {
             e.base  += (f - e.base) * 0.0005f;
         }
         const float noise = fmaxf(e.noise, 0.25f);
+        float dev = e.drift_base - f;
 
         // A press from the web manual clears every threshold, whatever the fader says
         if (i < 12 && _press[i] > 0.f) {
             const float need = fmaxf(fmaxf(_thr, noise * _noise_mul), fmaxf(kFirmOn, noise * kFirmNoise));
             delta = fmaxf(delta, need * 1.5f + _press[i] * _range);
+            dev = fmaxf(dev, delta);
         }
 
         // Firm touch (fixed, for control pads) ............................
@@ -248,7 +292,7 @@ void Field::Process() {
             if (++e.rel_cnt >= 2) {
                 e.active = false;
                 if (e.strike > 0) e.strike = 1;            // very short blip: still emit the strike below
-                if (_listener && i < spore::kFieldPads && e.strike == 0) _listener->OnRelease(i);
+                if (touch_events && i < spore::kFieldPads && e.strike == 0) touch_events->OnRelease(i);
             }
         } else {
             e.rel_cnt = 0;
@@ -256,11 +300,11 @@ void Field::Process() {
 
         if (e.strike > 0) {
             e.peak = fmaxf(e.peak, delta);
-            if (--e.strike == 0 && _listener && i < spore::kFieldPads) {
+            if (--e.strike == 0 && touch_events && i < spore::kFieldPads) {
                 float n = fclamp((e.peak - thr) / _range, 0.f, 1.f);
                 float vel = fclamp(0.35f * n + 0.65f * sqrtf(n), 0.05f, 1.f);
-                _listener->OnStrike(i, vel);
-                if (!e.active) _listener->OnRelease(i);
+                touch_events->OnStrike(i, vel);
+                if (!e.active) touch_events->OnRelease(i);
             }
         }
 
@@ -268,6 +312,8 @@ void Field::Process() {
         const float z = d / noise;                   // change relative to this electrode's own noise
         e.act += (z - e.act) * 0.25f;
         e.act_out = fclamp((e.act - 1.f) / 6.f, 0.f, 1.f);
+        if (i < spore::kFieldPads) _ProcessDrift(e, i, f, dev, d, noise);
+        if (_drift) continue;              // _ProcessDrift owns e.refr in this mode
         if (e.refr > 0) {
             e.refr--;
         } else if (e.act > _flick_thr && i < spore::kFieldPads) {

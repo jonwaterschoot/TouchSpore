@@ -13,6 +13,10 @@ To recalibrate, hold P10+P11 for 2.5 seconds, then let go. It runs once both pad
 
 **How touches trigger the notes:** Each field pad plays one note of the scale (default D minor). P03–P09 play upward from the root, and P00–P02 continue above P09. A firm touch (a strike) plays its note at once. Smaller fluctuations (flickers, upper half of the fader) and the autoplay generator suggest notes too, and these wait for the next sixteenth note of a 60 BPM grid. A density filter then picks which of them play. The busier the field, the fewer notes pass, and the ones that do move in small steps and land on chord tones on the beat. This can cause some actual touches to not fire a note immediatly.
 
+**Drift mode:** tap P10 and P11 together to switch it on or off (LED: 2 blinks = on, 1 = off). P00–P09 stop firing strikes and flickers. Each pad fires notes at random instead, and its reading sets how often. There is no touch threshold, so a hand too far away to trigger a strike still steers the notes, and a held touch or clip keeps firing.
+
+S37 sets how small a reading counts. Near the top, noise alone plays. All drift notes wait for the sixteenth grid and the density filter, and they need P11 on. SW2 down turns autoplay off, so only drift notes play. After switching on with S37 above 70 %, recalibrate once to move the chip to the Smooth profile.
+
 Built on the TouchString project structure and its introduction of velocity emulation.
 
 ## Controls
@@ -30,6 +34,7 @@ Built on the TouchString project structure and its introduction of velocity emul
 | P00–P09 | The field: a strike plays its note at once; flickers and intensity feed the generator |
 | P10 tap | Toggle field → slow pads (a strike makes that pad the chord root, at once) |
 | P11 tap | Toggle field → plinks (on by default) |
+| P10 + P11 tap together | Toggle drift mode: random notes weighted by pad readings |
 | P10 + P11 hold 2.5 s, let go | Recalibrate. Do this after attaching/removing clips |
 | P10 + P11 hold, move S36 | Volume (default 60 %). See below |
 | P10 + P11 hold, touch P02–P09 | Scale. See below |
@@ -47,7 +52,7 @@ Built on the TouchString project structure and its introduction of velocity emul
 
 After a scale or root pick you can let go of P10 and P11 and keep picking until 2 seconds after the last pick.
 
-**Saved settings:** volume, scale and root are stored in the Daisy's QSPI flash and load at boot. They survive a firmware update. The gestures save when they end, and root or scale sent over MIDI save 5 seconds after the last change. The LED flickers for 0.5 s after a save. Pads and knobs pause for up to 0.3 s during a save, and audio keeps playing. The P10/P11 routing is not saved and returns to plinks only at every boot.
+**Saved settings:** volume, scale and root are stored in the Daisy's QSPI flash and load at boot. They survive a firmware update. The gestures save when they end, and root or scale sent over MIDI save 5 seconds after the last change. The LED flickers for 0.5 s after a save. Pads and knobs pause for up to 0.3 s during a save, and audio keeps playing. The P10/P11 routing and drift mode are not saved. Every boot starts with plinks only, in touch mode.
 
 **Per-note variation** (SW2 up): every plink samples three drunk walks (random walks) plus its own
 small jitter. These offset octave (−1/0/+1), tone (S34 ±0.5) and attack/decay (S35 ±0.65) around the
@@ -90,10 +95,11 @@ the whole board as one antenna) and does everything in software, so it can chang
 - **Aura**: the proximity electrode adds to intensity once the field is sensitive.
 - **AFE profile** (AFE = analog front end, the part of the MPR121 that charges each pad and
   measures it, before any digital processing) is chosen at recalibration: *Smooth* (heavy filtering) below 70 % on the fader,
-  *Raw* (light filtering, more variance) above. Recalibrating also re-runs the MPR121 auto-config,
+  *Raw* (light filtering, more variance) above. Drift mode always recalibrates to Smooth. Recalibrating also re-runs the MPR121 auto-config,
   which adapts charge current/time to whatever is clipped on. This is what makes clips work.
+- **Drift mode** (`Field::_ProcessDrift()`): each pad gets a weight from a 200 ms average of its distance from a slow baseline, plus its average movement between polls. The averaging resolves less than 1 count, which is why it reaches further than the 1 count threshold. Fire chance per poll follows the weight, up to 6 notes/s per pad. The whole-board electrode adds a little to every pad.
 
-All curves are in `Field::_UpdateDerived()`; they are first guesses to tune on the board.
+The fader curves are in `Field::_UpdateDerived()` and are first guesses to tune on the board. The drift values are the `kDrift` constants in `touch/field.cpp`.
 
 ## Generative side (`engine/sequencer.cpp`)
 
@@ -178,7 +184,7 @@ node ../simple-touch-web/scripts/build.mjs .
 node ../simple-touch-web/test/smoke.mjs build-web/TouchSpore.wasm
 ```
 
-The browser has no QSPI flash, so volume, scale and root return to their defaults on every load. Strikes play as on the panel. Flickers, the aura and the top half of S37 do nothing, because the browser's touch chip has no noise. Recalibrate needs a 10 s hold of P10 + P11 there (2.5 s on the board), which leaves time to reach S36, P00 or P02–P09 with a mouse.
+The browser has no QSPI flash, so volume, scale and root return to their defaults on every load. Strikes play as on the panel. Flickers, the aura and the top half of S37 do nothing, because the browser's touch chip has no noise. Drift mode fires only from pressed pads there. Recalibrate needs a 10 s hold of P10 + P11 there (2.5 s on the board), which leaves time to reach S36, P00 or P02–P09 with a mouse.
 
 ### Release
 

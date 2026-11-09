@@ -30,7 +30,9 @@ public:
 //    playing" behaviour). This also works with crocodile clips/wires on the pads.
 //  • Two AFE profiles: Smooth (heavy filtering, stable touch) and Raw (light
 //    filtering, lets the fluctuations through). Chosen at Recalibrate() from the
-//    current sensitivity, so they never glitch mid-performance.
+//    current sensitivity (Smooth in drift mode), so they never glitch mid-performance.
+//  • Drift mode replaces strikes and flickers with random firing per pad. The fire rate
+//    follows a slow average of the pad's reading, with no touch threshold (_ProcessDrift).
 class Field {
 public:
     enum class Profile : uint8_t { Smooth, Raw };
@@ -49,6 +51,10 @@ public:
     // 0 = needs a firm touch … 1 = reacts to presence, wires act as antennas, noise becomes music
     void  SetSensitivity(float s);
     float Sensitivity() const { return _sens; }
+
+    // Drift mode fires OnFlicker only, and the firm touch for P10/P11 stays as it is.
+    void SetDrift(bool on) { _drift = on; }
+    bool Drift() const     { return _drift; }
 
     float Level(uint8_t e) const    { return _el[e].level; }     // 0..1 continuous proximity/pressure
     float Activity(uint8_t e) const { return _el[e].act_out; }   // 0..1 fluctuation amount
@@ -83,6 +89,9 @@ private:
         float   act      = 0.f;   // fluctuation z-score envelope
         float   act_out  = 0.f;
         float   peak     = 0.f;
+        float   drift_base = 0.f; // symmetric slow baseline: idle noise averages to 0 (counts)
+        float   drift_dev  = 0.f; // ~200 ms average of (drift_base − reading), below 1 count (counts)
+        float   drift_move = 0.f; // ~200 ms average of |Δ| between polls (counts)
         uint16_t held    = 0;
         uint8_t strike   = 0;     // strike window countdown (velocity measurement)
         uint8_t rel_cnt  = 0;
@@ -97,6 +106,7 @@ private:
     bool _WriteRegister(uint8_t reg, uint8_t val);
     bool _ReadBurst(uint8_t start_reg, uint8_t* buffer, uint16_t size);
     void _UpdateDerived();
+    void _ProcessDrift(Electrode& e, uint8_t pad, float f, float dev, float d, float noise);
 
     static constexpr uint8_t kAddr = 0x5A;
 
@@ -116,6 +126,8 @@ private:
     Profile _profile  = Profile::Smooth;
     float   _sens     = 0.f;
     float   _aura     = 0.f;
+    bool    _drift    = false;
+    uint32_t _dice    = 0x9E3779B9u;
     uint16_t _settle  = 0;         // polls of event-free settling after (re)calibration
 
     // Derived from sensitivity (recomputed in SetSensitivity)
