@@ -4,6 +4,7 @@ Builds of this firmware for the browser, made with [simple-touch-web](https://gi
 
 | Build | Built (UTC) | From | Test bench |
 | --- | --- | --- | --- |
+| [TouchSpore-ebb217b267b0.wasm](TouchSpore-ebb217b267b0.wasm) | 2026-11-09 00:53 | cc89d9f | [play](https://jonwaterschoot.github.io/simple-touch-web/demo/?wasm=https://raw.githubusercontent.com/jonwaterschoot/TouchSpore/simple-touch-web/TouchSpore-ebb217b267b0.wasm) |
 | [TouchSpore-8ad19b09a30c.wasm](TouchSpore-8ad19b09a30c.wasm) | 2026-11-08 23:26 | aaa1a8e | [play](https://jonwaterschoot.github.io/simple-touch-web/demo/?wasm=https://raw.githubusercontent.com/jonwaterschoot/TouchSpore/simple-touch-web/TouchSpore-8ad19b09a30c.wasm) |
 | [TouchSpore-5900ba1688cd.wasm](TouchSpore-5900ba1688cd.wasm) | 2026-11-08 23:26 | a49ad93 | [play](https://jonwaterschoot.github.io/simple-touch-web/demo/?wasm=https://raw.githubusercontent.com/jonwaterschoot/TouchSpore/simple-touch-web/TouchSpore-5900ba1688cd.wasm) |
 | [TouchSpore-dc0f4370cbd5.wasm](TouchSpore-dc0f4370cbd5.wasm) | 2026-11-08 18:59 | c593c38 | [play](https://jonwaterschoot.github.io/simple-touch-web/demo/?wasm=https://raw.githubusercontent.com/jonwaterschoot/TouchSpore/simple-touch-web/TouchSpore-dc0f4370cbd5.wasm) |
