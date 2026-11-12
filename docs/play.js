@@ -29,7 +29,7 @@ const PLAY_LEVERS = {
 };
 const FADER_RUN = [861, 618];   // fader cap centre at 0 and at 1 (panel units)
 
-const STAGE_LABELS = {all:'All labels', nopads:'No pad labels', faceplate:'Faceplate', clean:'No labels'};   // the full screen button's views, in order
+const STAGE_LABELS = {all:'All labels', nopads:'No pad labels', faceplate:'Faceplate', clean:'No labels'};   // the Labels button's views, in order (page toolbar and full screen)
 
 const Play = (()=>{
   const S = {
@@ -49,7 +49,7 @@ const Play = (()=>{
     midi:null, midiIn:'', midiOut:'', runOut:0, last:{}, sysex:{}, mval:{}, midiPads:{}, ccOut:{},   // Web MIDI: access, chosen ports ('*' = all inputs); last message and SysEx per table row; last value per control; the firmware's last value per CC
     hot:new Set(), cool:{},   // table rows of the controls in use
     mode:null, held:[],       // the toggle modifier tapped last, the hold modifiers held: the labels follow them
-    lock:matchMedia('(pointer: coarse)').matches, stage:false, sound:false, labels:'all',   // touch: scroll lock; full screen, its sound sheet and label view (STAGE_LABELS)
+    lock:matchMedia('(pointer: coarse)').matches, stage:false, sound:false, labels:'all',   // touch: scroll lock; full screen and its sound sheet; label view (STAGE_LABELS), in and out of full screen
   };
   try{ const k=localStorage.getItem(PLAY_KEYS_PREF); if(PLAY_LAYOUTS[k]){ S.layout=k; S.layoutSet=true; } }catch(e){}
   try{ const l=localStorage.getItem(PLAY_LOCK_PREF); if(l) S.lock= l==='1'; }catch(e){}
@@ -111,22 +111,26 @@ const Play = (()=>{
   function build(box){
     box.innerHTML=`<div class="pctl" id="playSrcRow" hidden>
       <span class="cap">Mode</span><span class="seg" id="playSrc"></span>
-    </div><div class="pctl b-only">
-      <button type="button" id="playGo" class="primary">▶ Play</button>
-      <button type="button" id="playInfo" class="info" title="How to play" aria-label="How to play">i</button>
-      <label><span class="cap">Input</span><select id="playIn" aria-label="Audio input"></select></label>
-      <input type="file" id="playFile" accept="audio/*" hidden>
-      <label><span class="cap">In level</span><input type="range" id="playInLevel" min="0" max="1.5" step="0.01"></label>
-      <label><span class="cap">Volume</span><input type="range" id="playVol" min="0" max="1" step="0.01"></label>
-      <span class="pmeter" title="Output level"><i id="playMeter"></i></span>
-      <label class="chk"><input type="checkbox" id="playOled"> OLED</label>
-      <span class="status" id="playMsg" role="status"></span>
-    </div><div class="pctl">
-      <label class="midi b-only"><span class="cap">MIDI in</span><select id="playMidiIn" aria-label="MIDI input"></select></label>
-      <label class="midi b-only"><span class="cap">MIDI out</span><select id="playMidiOut" aria-label="MIDI output"></select></label>
-      <span class="keys b-only"><span class="cap">Keys</span><span class="seg" id="playKeys"></span></span>
-      <button type="button" id="playLock" class="tight" title="Touches on the drawing never scroll the page">Lock scroll</button>
-      <button type="button" id="playStage" class="tight" title="The drawing alone, filling the screen">⛶ Full screen</button>
+    </div><div class="pgrid">
+      <div class="pgroup pgo b-only">
+        <div class="prow"><button type="button" id="playGo" class="primary">▶ Play</button><button type="button" id="playInfo" class="info" title="How to play" aria-label="How to play">i</button></div>
+        <span class="status" id="playMsg" role="status"></span>
+      </div>
+      <div class="pgroup b-only"><span class="cap">Sound</span>
+        <label><span>Input</span><select id="playIn" aria-label="Audio input"></select></label>
+        <input type="file" id="playFile" accept="audio/*" hidden>
+        <label><span>In level</span><input type="range" id="playInLevel" min="0" max="1.5" step="0.01"></label>
+        <label><span>Volume</span><input type="range" id="playVol" min="0" max="1" step="0.01"><span class="pmeter" title="Output level"><i id="playMeter"></i></span></label>
+      </div>
+      <div class="pgroup b-only"><span class="cap">MIDI and keys</span>
+        <label class="midi"><span>MIDI in</span><select id="playMidiIn" aria-label="MIDI input"></select></label>
+        <label class="midi"><span>MIDI out</span><select id="playMidiOut" aria-label="MIDI output"></select></label>
+        <div class="keys"><span>Keys</span><span class="seg" id="playKeys"></span></div>
+      </div>
+      <div class="pgroup"><span class="cap">View</span>
+        <div class="prow"><button type="button" id="playLock" class="tight" title="Touches on the drawing never scroll the page">Lock scroll</button><button type="button" id="playStage" class="tight" title="The drawing alone, filling the screen">⛶ Full screen</button></div>
+        <label class="chk b-only"><input type="checkbox" id="playOled"> OLED</label>
+      </div>
     </div><div class="device d-only" id="playLink"></div><div class="device" id="playDevice" hidden></div>`;
     $p('playLock').onclick=()=>{ S.lock=!S.lock; try{ localStorage.setItem(PLAY_LOCK_PREF, S.lock?'1':'0'); }catch(err){} body(); };
     $p('playStage').onclick=()=>stage(!S.stage);
@@ -152,8 +156,7 @@ const Play = (()=>{
     b.classList.toggle('play-lock', on && S.lock);
     b.classList.toggle('play-stage', S.stage);
     b.classList.toggle('stage-sound', S.stage && S.sound);
-    const view=labelView();
-    for(const k of ['nopads','faceplate','clean']) b.classList.toggle('stage-'+k, S.stage && view===k);
+    labelClasses();
     $p('playLock')?.setAttribute('aria-pressed', String(S.lock));
     $p('playStage')?.setAttribute('aria-pressed', String(S.stage));
     const bar=$p('stageBar'); if(!bar) return;
@@ -161,6 +164,28 @@ const Play = (()=>{
     bar.querySelector('[data-a="go"]').hidden= S.source==='device';   // a board plays by itself
     bar.querySelector('[data-a="sound"]').textContent= S.source==='device'? 'Settings' : 'Sound';
     bar.querySelector('[data-a="sound"]').setAttribute('aria-pressed', String(S.sound));
+    bar.querySelector('[data-a="labels"]').textContent=STAGE_LABELS[labelView()];
+  }
+  function labelClasses(){
+    const view=labelView();
+    for(const k of ['nopads','faceplate','clean']) document.body.classList.toggle('lbl-'+k, view===k);
+    const btn=$p('lblBtn'); if(btn) btn.textContent=STAGE_LABELS[view];
+    figBar(view);
+  }
+  /* while the drawing is live, Labels and Full screen sit under it (as in full screen) and leave the toolbar and the Play box.
+     The page writes #fig anew on every draw, so the bar is added back each time. */
+  function figBar(view){
+    const fig=$p('fig'), on=showing() && !S.stage;
+    document.body.classList.toggle('fig-tools', on);
+    let bar=fig?.querySelector(':scope > .figbar');
+    if(!on){ bar?.remove(); return; }
+    if(!fig) return;
+    if(!bar){
+      bar=document.createElement('div'); bar.className='figbar';
+      bar.innerHTML=`<button type="button" data-a="labels" class="tight lbl" title="Switches which labels show on the drawing"></button><button type="button" data-a="stage" class="tight" title="The drawing alone, filling the screen">⛶ Full screen</button>`;
+      bar.onclick=e=>{ const a=e.target.closest('button')?.dataset.a; if(a==='labels') nextLabels(); else if(a==='stage') stage(true); };
+      fig.append(bar);
+    }
     bar.querySelector('[data-a="labels"]').textContent=STAGE_LABELS[view];
   }
   /* Faceplate is offered when the file has faceplate labels, also on a layout that has them off */
@@ -170,7 +195,7 @@ const Play = (()=>{
     const v=labelViews(); S.labels=v[(v.indexOf(labelView())+1)%v.length];
     const force=S.labels==='faceplate';
     if(force!==fplForce){ fplForce=force; if(S.svg) relabel(true); else refresh(); }   // while playing only the labels are drawn again, so held controls stay held
-    body();
+    body(); labelClasses();
   }
   function stage(on){
     S.stage=on; S.sound=false;
@@ -186,7 +211,6 @@ const Play = (()=>{
       document.body.append(bar);
     }
     if(!on) bar?.remove();
-    fplForce= on && labelView()==='faceplate';
     const fs=document.fullscreenElement;
     if(on && !fs) document.documentElement.requestFullscreen?.().catch(()=>{});
     if(!on && fs) document.exitFullscreen?.().catch(()=>{});
@@ -345,10 +369,21 @@ const Play = (()=>{
     const device=deviceMod.parseDevice(doc.device); if(!device) return;
     S.panel=deviceMod.mountDevicePanel(box, device, {send:deviceSend,
       idle:()=> S.source==='device'? 'Not sent: plug in the Simple Touch and choose its MIDI port.' : 'Not sent: press Play first, or choose Connect to Simple Touch.'});
+    keyboards(box);
     S.link=linkMod.mountDeviceLink($p('playLink'), device, {onMidi:d=>S.panel?.midi(d), onChange:()=>{ S.panel?.reset(); S.panel?.ask(); }, live:LIVE_HANDLERS});
     S.follows=S.link.follows; S.oledRows=device.live?.oled?.rows||0;
     box.hidden=false;
     if(S.source==='device') refresh();
+  }
+  /* a setting with the 12 note names as buttons (a root note) is drawn as one octave of keys (ui.css .keyboard) */
+  function keyboards(box){
+    const NOTE_RE=/^([A-G])([#♯b♭]?)$/;
+    for(const g of box.querySelectorAll('.device-choices')){
+      const bs=[...g.querySelectorAll('button')];
+      if(bs.length!==12 || !bs.every(b=>NOTE_RE.test(b.textContent.trim()))) continue;
+      g.classList.add('keyboard');
+      for(const b of bs){ b.title=b.textContent.trim(); if(NOTE_RE.exec(b.title)[2]) b.classList.add('k-black'); }
+    }
   }
   function bindMidi(){
     if(!S.midi) return;
@@ -466,7 +501,8 @@ const Play = (()=>{
   }
   /* after the labels were drawn again: which hide under "No pad labels", and the marks on them */
   function tagLabels(){
-    document.querySelectorAll('#fig g[data-key]').forEach(g=>{ const k=SLOT[g.dataset.key.replace(/^[nf]:/,'')]?.kind; if(k==='pad'||k==='mod'||k==='switch') g.classList.add('padlabel'); });
+    labelClasses();
+    document.querySelectorAll('#fig g[data-key], #fig g[data-lead]').forEach(g=>{ const k=SLOT[(g.dataset.key||g.dataset.lead).replace(/^[nf]:/,'')]?.kind; if(k==='pad'||k==='mod'||k==='switch') g.classList.add('padlabel'); });
     for(const id of S.hot) paintRow(id);
     const h=hovId; hovId=null; setHover(h);
   }
@@ -613,7 +649,7 @@ const Play = (()=>{
   }
 
   function attach(fig){
-    S.svg=null; S.mod=null;
+    S.svg=null; S.mod=null; labelClasses();   // the page set body's class anew
     if(!showing()) return;
     const svg=fig.querySelector('svg'); if(!svg) return;
     const art= design.themes[V.theme].panel.drawing!=='simple' && tagPadArt();
@@ -797,7 +833,7 @@ const Play = (()=>{
   }
 
   return {
-    strip, attach, table, reset, stop,
+    strip, attach, table, reset, stop, nextLabels,
     get on(){ return showing(); },
     get stage(){ return S.stage; },
   };

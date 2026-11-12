@@ -38,8 +38,12 @@
   </header>
 
   <div class="bar">
-    <div class="grp"><span class="cap">Theme</span><div class="seg" id="themeSeg"></div><button type="button" id="themeMore" class="tight" hidden>Other themes</button></div>
-    <div class="grp"><span class="cap">Layout</span><div class="seg" id="layoutSeg"></div><div class="seg" id="arrangeSeg" title="Main and secondary next to each other or one above the other"></div></div>
+    <div class="grp view" id="viewGrp">
+      <label class="grp"><span class="cap">Theme</span><select id="themeSel"></select></label>
+      <div class="grp"><span class="cap">Layout</span><div class="seg" id="layoutSeg"></div><div class="seg" id="arrangeSeg" title="Main and secondary next to each other or one above the other"></div></div>
+    </div>
+    <div class="grp lblgrp"><span class="cap">Labels</span><button type="button" id="lblBtn" class="tight lbl" title="Switches which labels show on the drawing">All labels</button></div>
+    <button type="button" id="viewBtn" class="tight viewbtn" aria-expanded="false" aria-controls="viewGrp">View ▾</button>
     <div class="grp" id="modeGrp" hidden><span class="cap">Mode</span><div class="seg" id="modeSeg"></div></div>
   </div>
 
@@ -65,7 +69,7 @@
 const LIBRARY='https://jonwaterschoot.github.io/simple-touch-labels/';
 let doc=emptyDoc();
 const V={theme:'panel', layout:'phone', ref:'', refMode:'empty', focusId:null, mode:''};
-const UI={theme:'panel', libTheme:'panel', allThemes:false, arrange:'side', repo:'', from:''};
+const UI={theme:'panel', libTheme:'panel', arrange:'side', repo:'', from:''};
 const $=id=>document.getElementById(id);
 let ready=false;
 
@@ -74,11 +78,10 @@ function seg(el, opts, isOn, pick){
   for(const [v,l] of opts){ const b=document.createElement('button'); b.type='button'; b.textContent=l; b.setAttribute('aria-pressed',String(!!isOn(v))); b.onclick=()=>pick(v); el.append(b); }
 }
 function buildBars(){
-  // a creator's look: that one alone, with the others one click away
-  const lookOnly=doc.look && UI.theme==='creator' && !UI.allThemes;
-  $('themeMore').hidden=!lookOnly;
-  seg($('themeSeg'), lookOnly? [['creator','Creator']] : [...(doc.look? [['creator','Creator']] : []), ...THEME_NAMES], v=>v===(doc.look? UI.theme : UI.libTheme),
-    v=>{ UI.theme=v; if(v==='creator') UI.allThemes=false; else UI.libTheme=v; update(); });
+  // the creator's look first; the library's themes below it
+  const ts=$('themeSel');
+  ts.replaceChildren(...(doc.look? [new Option('Creator','creator')] : []), ...THEME_NAMES.map(([k,l])=>new Option(l,k)));
+  ts.value= doc.look? UI.theme : UI.libTheme;
   seg($('layoutSeg'), [['phone','Phone'],['desktop','Desktop']], v=>V.layout===v, v=>{ V.layout=v; update(); });
   seg($('arrangeSeg'), [['side','Side by side'],['stack','Stacked']], v=>UI.arrange===v, v=>{ UI.arrange=v; update(); });
   // modes (doc.modes, core.js): all of them (the print set) or one; while playing, the lever picks
@@ -164,7 +167,10 @@ $('libSplit').addEventListener('pointerdown',e=>{
   addEventListener('pointermove',move); addEventListener('pointerup',up);
 });
 $('libSplit').addEventListener('dblclick',()=>{ try{ localStorage.removeItem(figKey()); }catch(e){} sizeFig(); });
-$('themeMore').onclick=()=>{ UI.allThemes=true; buildBars(); };
+$('themeSel').onchange=e=>{ const v=e.target.value; UI.theme=v; if(v!=='creator') UI.libTheme=v; update(); };
+$('lblBtn').onclick=()=>Play.nextLabels();
+/* phones: theme and layout fold away behind View */
+$('viewBtn').onclick=()=>{ const open=$('viewBtn').closest('.bar').classList.toggle('view-open'); $('viewBtn').setAttribute('aria-expanded',String(open)); };
 
 (async()=>{
   const q=new URLSearchParams(location.search);

@@ -124,11 +124,11 @@ const THEME_DEFAULT = {
     desktop: { mw:2,   ow:1, box:'#ffffff', text:'#1c1c1b', line:'#1c1c1b', ref:'#7d7979', ...MODS_DEF },
     panel:   { bg:'#ffffff', line:'#1c1c1b', shape:'#1c1c1b', mid:'#8a8a87', fp:'#1c1c1b', leader:'#1c1c1b', ink:'#1c1c1b' } },
 };
-const THEME_NAMES = [['light','Light'],['dark','Dark'],['vis','Visualiser'],['panel','Synthux panel'],['gold','Synthux gold'],['print','Print']];
+const THEME_NAMES = [['light','Light'],['dark','Dark'],['vis','Visualiser'],['panel','Synthux panel'],['gold','Synthux gold'],['print','Synthux light']];
 const DESIGN_V = 2;
 const DESIGN_DEFAULT = {
   v: DESIGN_V,
-  size1:25, size2:21, size3:null, padX:14, padY:10, radius:10, gap:8, weight:400,
+  size1:28, size2:23, size3:null, padX:14, padY:10, radius:10, gap:8, weight:400,
   modStyle:'outline',    // modifier label in secondary view: outline | filled | hold | double
   multiMod:'divided',    // control with 2+ modifiers (secondary view): divided | separate
   boxOpacity:1,          // label box fill, 0 = no box
@@ -418,6 +418,7 @@ const EXAMPLES = {
   touchfx:     { label:'Touch FX',        file:'examples/touchfx.json',     repo:'https://github.com/Synthux-Academy/TouchFX', faceplateFile:'examples/faceplates/touchfx.svg' },
   touchstring: { label:'Touch String',    file:'examples/touchstring.json', repo:'https://github.com/Synthux-Academy/TouchString', faceplateFile:'examples/faceplates/touchstring.svg' },
   audreytouch: { label:'Audrey II Touch', file:'examples/audreytouch.json', repo:'https://github.com/Synthux-Academy/AudreyTouch' },
+  touchbloop:  { label:'TouchBloop',      file:'examples/touchbloop.json',  repo:'https://github.com/Synthux-Academy/TouchBloop' },
 };
 const exampleCache = {};
 async function loadExample(key){
@@ -569,7 +570,7 @@ function slotLines0(s, mode='phone'){
   return L;
 }
 const ownStyle = c => (ownStyles && c.style) || {};
-const paintOn = () => !bw && T.theme!=='print';   // Print and B&W keep an extra label's font and size, not its colours
+const paintOn = () => !bw && T.theme!=='print';   // Synthux light (also the Print export) and B&W keep an extra label's font and size, not its colours
 function customLines(c){
   const q=ownStyle(c), L=[], color=(paintOn() && q.text)||T.text;
   const add=(t,size,px)=>{ t=(t||'').trim(); if(t) L.push({text:capsT(t),color,size,px,family:q.family,weight:q.weight}); };
@@ -853,7 +854,7 @@ function fplSpot(s,mode,sz){
   if(s.kind==='led') return {x:s.x, y:s.y+14+sz*0.5};
   return {x:s.x, y:s.y-(mode==='phone'? 46 : 14)-sz*0.5};   // pads: clear of the box or the leader's dot on them
 }
-let fplForce = false;   // full screen's Faceplate view (play.js): draws them on a layout set to off too
+let fplForce = false;   // the Labels button's Faceplate view (play.js): draws them on a layout set to off too
 function fpLabelsSVG(mode){
   if(!fplOn(mode) && !(fplForce && doc.fpLabels?.on)) return '';
   const sz=doc.fpLabels[mode].size, q=design.themes[T.theme].panel, f=v=>v.toFixed(1);
@@ -1059,13 +1060,13 @@ function buildDesktop(forExport,th=V.theme,pt=part,frame){
   const lw=design.leaderW??2.5, dot=s=>`<circle cx="${s.x}" cy="${s.y}" r="${Math.max(4,lw*2.8).toFixed(1)}" fill="${T.leader}"/>`;
   for(const k of ['L','R']) for(const o of side[k]){
     const a=rim(o,k), pts=a.map(p=>p.map(v=>(+v).toFixed(1)).join(',')).join(' ');
-    lines+=`<polyline points="${pts}" fill="none" stroke="${T.leader}" stroke-opacity=".6" stroke-width="${lw}"/>`+dot({x:a[0][0],y:a[0][1]});
+    lines+=`<g data-lead="${o.s.id}"><polyline points="${pts}" fill="none" stroke="${T.leader}" stroke-opacity=".6" stroke-width="${lw}"/>${dot({x:a[0][0],y:a[0][1]})}</g>`;   // data-lead: hidden with the label (Labels button)
     boxes+=boxG(o.s.id,placedBox(o,k==='L'?'start':'end',boxStyle(o.s)));
   }
   for(const o of topRow){
     const bx=o.x+o.w/2, by=o.y+o.h;
     const pts = Math.abs(bx-o.s.x)<1 ? `${o.s.x},${o.s.y} ${o.s.x},${by}` : `${o.s.x},${o.s.y} ${o.s.x},${(by+o.s.y)/2} ${bx},${(by+o.s.y)/2} ${bx},${by}`;
-    lines+=`<polyline points="${pts}" fill="none" stroke="${T.leader}" stroke-opacity=".6" stroke-width="${lw}"/>`+dot(o.s);
+    lines+=`<g data-lead="${o.s.id}"><polyline points="${pts}" fill="none" stroke="${T.leader}" stroke-opacity=".6" stroke-width="${lw}"/>${dot(o.s)}</g>`;
     boxes+=boxG(o.s.id,placedBox(o,'middle',boxStyle(o.s)));
   }
   if(curPart==='main') for(const c of doc.customs||[]){
@@ -1487,7 +1488,7 @@ const DOC_CSS = `
 .md .tw{overflow-x:auto;margin:0 0 1em}
 .md table,.ctab{border-collapse:collapse;width:100%;font-size:14px;line-height:1.3}
 .md th,.md td,.ctab th,.ctab td{text-align:left;padding:6px 10px 6px 0;border-bottom:1px solid var(--hair);vertical-align:top}
-.md th,.ctab th{border-bottom:2px solid var(--rule);font-weight:700}
+.md th,.ctab th{border-bottom:1px solid var(--rule);font-weight:700}
 .ctab .k{font-size:12px;color:var(--muted);font-weight:400}
 .ctab tr.blank td{height:30px}
 .ctab td.midi{font-family:ui-monospace,Menlo,monospace;font-size:.85em}
