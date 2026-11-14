@@ -269,7 +269,11 @@
     }
   },
   "listing": {
-    "video": "https://youtu.be/LsLw1mzLUBw"
+    "tags": ["Generative", "Ambient"],
+    "video": [
+      { "src": "https://youtu.be/LsLw1mzLUBw" },
+      { "src": "media/TouchSpore_webplayScreenrec.mp4", "text": "Screen recording of Play in the web app." }
+    ]
   },
   "emulator": {
     "wasm": "https://raw.githubusercontent.com/jonwaterschoot/TouchSpore/simple-touch-web/TouchSpore-98d142eaa94b.wasm",
